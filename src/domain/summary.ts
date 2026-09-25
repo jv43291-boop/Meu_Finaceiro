@@ -1,6 +1,18 @@
 import { currentMonthKey, monthDiff, shiftMonth, todayISO, type DateISO, type MonthKey } from './dates';
-import { itemsForMonth, materializedIndex, transactionToItem, virtualBetween } from './recurrence';
-import type { Account, ListItem, Recurrence, Transaction } from './types';
+import { invoiceItemsForMonth, isCardPurchase } from './cards';
+import { itemsForMonth } from './recurrence';
+import type { Account, CreditCard, ListItem, Recurrence, Transaction } from './types';
+
+/**
+ * Itens do fluxo de caixa de um mês: lançamentos e recorrências das contas,
+ * mais as faturas de cartão que vencem no mês. Compras no cartão ficam de fora
+ * (elas aparecem dentro da fatura).
+ */
+export function cashItemsForMonth(month: MonthKey, transactions: Transaction[], rules: Recurrence[], cards: CreditCard[] = [], today: DateISO = todayISO()): ListItem[] {
+  const base = itemsForMonth(month, transactions, rules).filter((i) => !isCardPurchase(i));
+  const invoices = cards.length ? invoiceItemsForMonth(month, { cards, transactions, recurrences: rules }, today) : [];
+  return [...base, ...invoices].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.type === b.type ? 0 : a.type === 'income' ? -1 : 1));
+}
 
 export interface MonthSummary {
   income: number;
@@ -33,6 +45,7 @@ export function accountBalances(accounts: Account[], transactions: Transaction[]
   for (const a of accounts) if (!a.deletedAt) map.set(a.id, a.openingBalanceCents);
   for (const t of transactions) {
     if (t.deletedAt || !t.paid || !t.accountId || !map.has(t.accountId)) continue;
+    if (t.cardId && !t.invoicePayment) continue; // compra no cartão não sai da conta
     map.set(t.accountId, (map.get(t.accountId) ?? 0) + signed(t.type, t.amountCents));
   }
   return map;
@@ -64,22 +77,21 @@ export function overview(
   accounts: Account[],
   transactions: Transaction[],
   rules: Recurrence[],
-  opts: { today?: DateISO; month?: MonthKey; upcomingDays?: number } = {},
+  opts: { today?: DateISO; month?: MonthKey; upcomingDays?: number; cards?: CreditCard[] } = {},
 ): Overview {
   const today = opts.today ?? todayISO();
   const month = opts.month ?? currentMonthKey(new Date(today + 'T12:00:00'));
   const horizon = shiftMonth(today.slice(0, 7), opts.upcomingDays ? 1 : 0);
-  const index = materializedIndex(transactions);
+  const cards = opts.cards ?? [];
   const balance = totalBalance(accounts, transactions);
 
   const earliest = earliestMonth(transactions, rules) ?? month;
   const lastMonth = monthDiff(month, horizon) > 0 ? horizon : month;
   const pending: ListItem[] = [];
-  for (const t of transactions) {
-    if (t.deletedAt || t.paid) continue;
-    if (monthDiff(t.date.slice(0, 7), lastMonth) >= 0) pending.push(transactionToItem(t));
+  // mês a mês, do começo do histórico até o horizonte (limite de segurança: 10 anos)
+  for (let m = earliest, n = 0; monthDiff(m, lastMonth) >= 0 && n < 120; m = shiftMonth(m, 1), n++) {
+    for (const it of cashItemsForMonth(m, transactions, rules, cards, today)) if (!it.paid) pending.push(it);
   }
-  pending.push(...virtualBetween(earliest, lastMonth, transactions, rules, index));
 
   let pendingIncome = 0, pendingExpense = 0;
   for (const p of pending) {
@@ -102,8 +114,8 @@ export function overview(
   };
 }
 
-export function monthSummary(month: MonthKey, transactions: Transaction[], rules: Recurrence[]): MonthSummary {
-  return summarizeItems(itemsForMonth(month, transactions, rules));
+export function monthSummary(month: MonthKey, transactions: Transaction[], rules: Recurrence[], cards: CreditCard[] = []): MonthSummary {
+  return summarizeItems(cashItemsForMonth(month, transactions, rules, cards));
 }
 
 function earliestMonth(transactions: Transaction[], rules: Recurrence[]): MonthKey | null {

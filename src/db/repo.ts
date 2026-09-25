@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { DEFAULT_ACCOUNT, DEFAULT_CATEGORIES } from '@/domain/defaults';
 import { stableId } from '@/domain/ids';
 import type { Changes } from '@/domain/operations';
-import type { Account, Category, Recurrence, Transaction } from '@/domain/types';
+import type { Account, Category, CreditCard, Recurrence, Transaction } from '@/domain/types';
 
 type Row = Record<string, any>;
 
@@ -22,8 +22,14 @@ const toCategory = (r: Row): Category => ({
 const toRecurrence = (r: Row): Recurrence => ({
   id: r.id, type: r.type, description: r.description, amountCents: r.amount_cents,
   categoryId: r.category_id, accountId: r.account_id, day: r.day, startMonth: r.start_month,
-  endMonth: r.end_month, notes: r.notes, createdAt: r.created_at, updatedAt: r.updated_at,
+  endMonth: r.end_month, notes: r.notes, cardId: r.card_id ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
   deletedAt: r.deleted_at,
+});
+
+const toCard = (r: Row): CreditCard => ({
+  id: r.id, name: r.name, limitCents: r.limit_cents, closingDay: r.closing_day, dueDay: r.due_day,
+  accountId: r.account_id, color: r.color, archived: bool(r.archived),
+  createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
 });
 
 const toTransaction = (r: Row): Transaction => ({
@@ -31,6 +37,7 @@ const toTransaction = (r: Row): Transaction => ({
   paid: bool(r.paid), categoryId: r.category_id, accountId: r.account_id, notes: r.notes,
   recurrenceId: r.recurrence_id, occurrenceMonth: r.occurrence_month, groupId: r.group_id,
   installmentNumber: r.installment_number, installmentTotal: r.installment_total,
+  cardId: r.card_id ?? null, invoiceMonth: r.invoice_month ?? null, invoicePayment: bool(r.invoice_payment),
   createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
 });
 
@@ -40,20 +47,23 @@ export interface Snapshot {
   recurrences: Recurrence[];
   /** inclui registros excluídos (marcadores de mês pulado) */
   transactions: Transaction[];
+  cards: CreditCard[];
 }
 
 export async function loadAll(db: SQLiteDatabase): Promise<Snapshot> {
-  const [a, c, r, t] = await Promise.all([
+  const [a, c, r, t, k] = await Promise.all([
     db.getAllAsync<Row>('SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY created_at'),
     db.getAllAsync<Row>('SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY type DESC, name'),
     db.getAllAsync<Row>('SELECT * FROM recurrences WHERE deleted_at IS NULL ORDER BY day, description'),
     db.getAllAsync<Row>('SELECT * FROM transactions ORDER BY date'),
+    db.getAllAsync<Row>('SELECT * FROM credit_cards WHERE deleted_at IS NULL ORDER BY created_at'),
   ]);
   return {
     accounts: a.map(toAccount),
     categories: c.map(toCategory),
     recurrences: r.map(toRecurrence),
     transactions: t.map(toTransaction),
+    cards: k.map(toCard),
   };
 }
 
@@ -66,6 +76,19 @@ export async function upsertAccount(db: SQLiteDatabase, a: Account) {
     {
       $id: a.id, $name: a.name, $kind: a.kind, $ob: a.openingBalanceCents, $color: a.color,
       $archived: a.archived ? 1 : 0, $ca: a.createdAt, $ua: a.updatedAt, $da: a.deletedAt,
+    },
+  );
+}
+
+export async function upsertCard(db: SQLiteDatabase, k: CreditCard) {
+  await db.runAsync(
+    `INSERT INTO credit_cards (id, name, limit_cents, closing_day, due_day, account_id, color, archived, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $name, $lim, $close, $due, $acc, $color, $archived, $ca, $ua, $da, 1)
+     ON CONFLICT(id) DO UPDATE SET name=$name, limit_cents=$lim, closing_day=$close, due_day=$due, account_id=$acc,
+       color=$color, archived=$archived, updated_at=$ua, deleted_at=$da, dirty=1`,
+    {
+      $id: k.id, $name: k.name, $lim: k.limitCents, $close: k.closingDay, $due: k.dueDay, $acc: k.accountId,
+      $color: k.color, $archived: k.archived ? 1 : 0, $ca: k.createdAt, $ua: k.updatedAt, $da: k.deletedAt,
     },
   );
 }
@@ -86,15 +109,15 @@ export async function upsertCategory(db: SQLiteDatabase, c: Category) {
 async function upsertRecurrence(db: SQLiteDatabase, r: Recurrence) {
   await db.runAsync(
     `INSERT INTO recurrences (id, type, description, amount_cents, category_id, account_id, day, start_month,
-       end_month, notes, created_at, updated_at, deleted_at, dirty)
-     VALUES ($id, $type, $desc, $amt, $cat, $acc, $day, $start, $end, $notes, $ca, $ua, $da, 1)
+       end_month, notes, card_id, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $type, $desc, $amt, $cat, $acc, $day, $start, $end, $notes, $card, $ca, $ua, $da, 1)
      ON CONFLICT(id) DO UPDATE SET type=$type, description=$desc, amount_cents=$amt, category_id=$cat,
-       account_id=$acc, day=$day, start_month=$start, end_month=$end, notes=$notes, updated_at=$ua,
+       account_id=$acc, day=$day, start_month=$start, end_month=$end, notes=$notes, card_id=$card, updated_at=$ua,
        deleted_at=$da, dirty=1`,
     {
       $id: r.id, $type: r.type, $desc: r.description, $amt: r.amountCents, $cat: r.categoryId,
       $acc: r.accountId, $day: r.day, $start: r.startMonth, $end: r.endMonth, $notes: r.notes,
-      $ca: r.createdAt, $ua: r.updatedAt, $da: r.deletedAt,
+      $card: r.cardId, $ca: r.createdAt, $ua: r.updatedAt, $da: r.deletedAt,
     },
   );
 }
@@ -103,16 +126,17 @@ async function upsertTransaction(db: SQLiteDatabase, t: Transaction) {
   await db.runAsync(
     `INSERT INTO transactions (id, type, description, amount_cents, date, paid, category_id, account_id, notes,
        recurrence_id, occurrence_month, group_id, installment_number, installment_total,
-       created_at, updated_at, deleted_at, dirty)
-     VALUES ($id, $type, $desc, $amt, $date, $paid, $cat, $acc, $notes, $rec, $occ, $grp, $in, $it, $ca, $ua, $da, 1)
+       card_id, invoice_month, invoice_payment, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $type, $desc, $amt, $date, $paid, $cat, $acc, $notes, $rec, $occ, $grp, $in, $it, $card, $inv, $invp, $ca, $ua, $da, 1)
      ON CONFLICT(id) DO UPDATE SET type=$type, description=$desc, amount_cents=$amt, date=$date, paid=$paid,
        category_id=$cat, account_id=$acc, notes=$notes, recurrence_id=$rec, occurrence_month=$occ,
-       group_id=$grp, installment_number=$in, installment_total=$it, updated_at=$ua, deleted_at=$da, dirty=1`,
+       group_id=$grp, installment_number=$in, installment_total=$it, card_id=$card, invoice_month=$inv,
+       invoice_payment=$invp, updated_at=$ua, deleted_at=$da, dirty=1`,
     {
       $id: t.id, $type: t.type, $desc: t.description, $amt: t.amountCents, $date: t.date,
       $paid: t.paid ? 1 : 0, $cat: t.categoryId, $acc: t.accountId, $notes: t.notes,
       $rec: t.recurrenceId, $occ: t.occurrenceMonth, $grp: t.groupId, $in: t.installmentNumber,
-      $it: t.installmentTotal, $ca: t.createdAt, $ua: t.updatedAt, $da: t.deletedAt,
+      $it: t.installmentTotal, $card: t.cardId, $inv: t.invoiceMonth, $invp: t.invoicePayment ? 1 : 0, $ca: t.createdAt, $ua: t.updatedAt, $da: t.deletedAt,
     },
   );
 }

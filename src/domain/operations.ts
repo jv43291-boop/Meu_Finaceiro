@@ -4,7 +4,7 @@
  * A camada de banco só aplica o resultado (upsert).
  */
 import { dateForDay, dayOf, monthDiff, monthOf, shiftMonth, type DateISO, type MonthKey } from './dates';
-import { occurrenceId } from './ids';
+import { occurrenceId, stableId } from './ids';
 import type { Scope } from './recurrence';
 import type { EntryType, ListItem, Recurrence, Transaction } from './types';
 
@@ -34,12 +34,17 @@ export interface EntryInput {
   categoryId: string | null;
   accountId: string | null;
   notes: string;
+  /** compra no cartão: a conta não é usada, e sim o cartão e a fatura */
+  cardId?: string | null;
+  /** mês de vencimento da fatura (obrigatório quando há cardId) */
+  invoiceMonth?: MonthKey | null;
 }
 
 export type EntryPatch = Partial<EntryInput>;
 
 function baseTx(ctx: Ctx, input: EntryInput): Transaction {
   const now = ctx.now();
+  const onCard = !!input.cardId;
   return {
     id: ctx.newId(),
     createdAt: now,
@@ -49,15 +54,18 @@ function baseTx(ctx: Ctx, input: EntryInput): Transaction {
     description: input.description.trim(),
     amountCents: input.amountCents,
     date: input.date,
-    paid: input.paid,
+    paid: onCard ? false : input.paid,
     categoryId: input.categoryId,
-    accountId: input.accountId,
+    accountId: onCard ? null : input.accountId,
     notes: input.notes.trim(),
     recurrenceId: null,
     occurrenceMonth: null,
     groupId: null,
     installmentNumber: null,
     installmentTotal: null,
+    cardId: input.cardId ?? null,
+    invoiceMonth: onCard ? (input.invoiceMonth ?? null) : null,
+    invoicePayment: false,
   };
 }
 
@@ -85,8 +93,13 @@ export function createEntry(ctx: Ctx, input: EntryInput, repeat: Repeat): Change
       tx.groupId = groupId;
       tx.installmentNumber = i + 1;
       tx.installmentTotal = total;
-      tx.date = dateForDay(shiftMonth(start, i), day);
-      tx.paid = i === 0 ? input.paid : false;
+      if (tx.cardId) {
+        // no cartão a data da compra é a mesma; cada parcela cai numa fatura seguinte
+        tx.invoiceMonth = tx.invoiceMonth ? shiftMonth(tx.invoiceMonth, i) : null;
+      } else {
+        tx.date = dateForDay(shiftMonth(start, i), day);
+        tx.paid = i === 0 ? input.paid : false;
+      }
       out.transactions.push(tx);
     }
     return out;
@@ -105,14 +118,15 @@ export function createEntry(ctx: Ctx, input: EntryInput, repeat: Repeat): Change
     description: input.description.trim(),
     amountCents: input.amountCents,
     categoryId: input.categoryId,
-    accountId: input.accountId,
+    accountId: input.cardId ? null : input.accountId,
     day: dayOf(input.date),
     startMonth: start,
     endMonth: months ? shiftMonth(start, months - 1) : null,
     notes: input.notes.trim(),
+    cardId: input.cardId ?? null,
   };
   out.recurrences.push(rule);
-  if (input.paid) out.transactions.push(materialize(ctx, rule, start, { paid: true, date: input.date }));
+  if (input.paid && !rule.cardId) out.transactions.push(materialize(ctx, rule, start, { paid: true, date: input.date }));
   return out;
 }
 
@@ -139,6 +153,9 @@ export function materialize(ctx: Ctx, rule: Recurrence, month: MonthKey, patch: 
       groupId: null,
       installmentNumber: null,
       installmentTotal: null,
+      cardId: rule.cardId,
+      invoiceMonth: null,
+      invoicePayment: false,
     },
     patch,
     now,
@@ -155,6 +172,14 @@ function applyPatch(t: Transaction, patch: EntryPatch, now: string): Transaction
   if (patch.categoryId !== undefined) next.categoryId = patch.categoryId;
   if (patch.accountId !== undefined) next.accountId = patch.accountId;
   if (patch.notes !== undefined) next.notes = patch.notes.trim();
+  if (patch.cardId !== undefined) next.cardId = patch.cardId;
+  if (patch.invoiceMonth !== undefined) next.invoiceMonth = patch.invoiceMonth;
+  if (next.cardId && !next.invoicePayment) {
+    next.accountId = null;
+    next.paid = false;
+  } else if (!next.cardId) {
+    next.invoiceMonth = null;
+  }
   return next;
 }
 
@@ -167,12 +192,14 @@ function applyRulePatch(r: Recurrence, patch: EntryPatch, now: string): Recurren
   if (patch.categoryId !== undefined) next.categoryId = patch.categoryId;
   if (patch.accountId !== undefined) next.accountId = patch.accountId;
   if (patch.notes !== undefined) next.notes = patch.notes.trim();
+  if (patch.cardId !== undefined) next.cardId = patch.cardId;
+  if (next.cardId) next.accountId = null;
   return next;
 }
 
 /** Campos que se propagam para outras ocorrências/parcelas (data e "pago" são de cada uma). */
 function sharedPatch(patch: EntryPatch): EntryPatch {
-  const { date: _d, paid: _p, ...rest } = patch;
+  const { date: _d, paid: _p, invoiceMonth: _i, ...rest } = patch;
   return rest;
 }
 
@@ -250,6 +277,13 @@ export function editItem(ctx: Ctx, state: State, item: ListItem, patch: EntryPat
 export function togglePaid(ctx: Ctx, state: State, item: ListItem): Changes {
   const out = empty();
   const tx = findTx(state, item.transactionId);
+  if (tx?.invoicePayment) {
+    // desmarcar o pagamento de uma fatura = desfazer o pagamento
+    const now = ctx.now();
+    out.transactions.push({ ...tx, deletedAt: now, updatedAt: now });
+    return out;
+  }
+  if (tx?.cardId) return out; // compra no cartão não tem "pago": quem paga é a fatura
   if (tx) {
     out.transactions.push({ ...tx, paid: !tx.paid, updatedAt: ctx.now() });
     return out;
@@ -308,4 +342,52 @@ export function endRecurrence(ctx: Ctx, rule: Recurrence, lastMonth: MonthKey): 
     return { transactions: [], recurrences: [{ ...rule, deletedAt: now, updatedAt: now }] };
   }
   return { transactions: [], recurrences: [{ ...rule, endMonth: lastMonth, updatedAt: now }] };
+}
+
+/**
+ * Registra o pagamento de uma fatura: um lançamento de saída na conta,
+ * com id fixo por (cartão, mês) — pagar de novo no outro aparelho não duplica.
+ */
+export function payInvoice(
+  ctx: Ctx,
+  args: { cardId: string; cardName: string; invoiceMonth: MonthKey; accountId: string | null; amountCents: number; date: DateISO; categoryId: string | null; existing?: Transaction },
+): Changes {
+  const now = ctx.now();
+  const base: Transaction = args.existing ?? {
+    id: stableId(`invoice:${args.cardId}:${args.invoiceMonth}`),
+    createdAt: now,
+    updatedAt: now,
+    deletedAt: null,
+    type: 'expense',
+    description: '',
+    amountCents: 0,
+    date: args.date,
+    paid: true,
+    categoryId: args.categoryId,
+    accountId: args.accountId,
+    notes: '',
+    recurrenceId: null,
+    occurrenceMonth: null,
+    groupId: null,
+    installmentNumber: null,
+    installmentTotal: null,
+    cardId: args.cardId,
+    invoiceMonth: args.invoiceMonth,
+    invoicePayment: true,
+  };
+  return {
+    recurrences: [],
+    transactions: [
+      {
+        ...base,
+        description: `Fatura ${args.cardName}`,
+        amountCents: args.amountCents,
+        date: args.date,
+        accountId: args.accountId,
+        paid: true,
+        deletedAt: null,
+        updatedAt: now,
+      },
+    ],
+  };
 }

@@ -86,6 +86,28 @@ const MIGRATIONS: string[] = [
     value TEXT NOT NULL
   );
   `,
+  // 2: cartão de crédito e faturas
+  `
+  CREATE TABLE credit_cards (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    limit_cents INTEGER NOT NULL DEFAULT 0,
+    closing_day INTEGER NOT NULL,
+    due_day INTEGER NOT NULL,
+    account_id TEXT,
+    color TEXT NOT NULL DEFAULT '#5B45FF',
+    archived INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    dirty INTEGER NOT NULL DEFAULT 1
+  );
+  ALTER TABLE transactions ADD COLUMN card_id TEXT;
+  ALTER TABLE transactions ADD COLUMN invoice_month TEXT;
+  ALTER TABLE transactions ADD COLUMN invoice_payment INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE recurrences ADD COLUMN card_id TEXT;
+  CREATE INDEX idx_transactions_card ON transactions (card_id, invoice_month);
+  `
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {

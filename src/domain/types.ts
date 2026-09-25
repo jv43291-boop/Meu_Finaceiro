@@ -18,6 +18,18 @@ export interface Account extends SyncFields {
   archived: boolean;
 }
 
+export interface CreditCard extends SyncFields {
+  name: string;
+  limitCents: number;
+  /** dia em que a fatura fecha; compras nesse dia ou depois entram na fatura seguinte */
+  closingDay: number;
+  dueDay: number;
+  /** conta sugerida para pagar a fatura */
+  accountId: string | null;
+  color: string;
+  archived: boolean;
+}
+
 export interface Category extends SyncFields {
   name: string;
   type: EntryType;
@@ -40,6 +52,8 @@ export interface Recurrence extends SyncFields {
   startMonth: MonthKey;
   endMonth: MonthKey | null;
   notes: string;
+  /** recorrência no cartão (assinaturas): cada ocorrência vira compra na fatura */
+  cardId: string | null;
 }
 
 export interface Transaction extends SyncFields {
@@ -58,6 +72,12 @@ export interface Transaction extends SyncFields {
   groupId: string | null;
   installmentNumber: number | null;
   installmentTotal: number | null;
+  /** compra no cartão (não mexe no saldo da conta) ou pagamento de fatura */
+  cardId: string | null;
+  /** mês de VENCIMENTO da fatura em que a compra entra; null = calcular pela data */
+  invoiceMonth: MonthKey | null;
+  /** true = este lançamento é o pagamento da fatura (sai da conta) */
+  invoicePayment: boolean;
 }
 
 /**
@@ -80,15 +100,29 @@ export interface ListItem {
   notes: string;
   installmentNumber: number | null;
   installmentTotal: number | null;
+  cardId: string | null;
+  invoiceMonth: MonthKey | null;
+  /** fatura de cartão ainda não paga (item calculado) */
+  invoice: boolean;
+  invoicePayment: boolean;
 }
 
 export function virtualKey(recurrenceId: string, month: MonthKey): string {
   return `r:${recurrenceId}:${month}`;
 }
 
+export function invoiceKey(cardId: string, month: MonthKey): string {
+  return `f:${cardId}:${month}`;
+}
+
 export function parseItemKey(key: string):
   | { kind: 'tx'; id: string }
-  | { kind: 'virtual'; recurrenceId: string; month: MonthKey } {
+  | { kind: 'virtual'; recurrenceId: string; month: MonthKey }
+  | { kind: 'invoice'; cardId: string; month: MonthKey } {
+  if (key.startsWith('f:')) {
+    const [, cardId, month] = key.split(':');
+    return { kind: 'invoice', cardId, month };
+  }
   if (key.startsWith('r:')) {
     const [, recurrenceId, month] = key.split(':');
     return { kind: 'virtual', recurrenceId, month };

@@ -1,24 +1,28 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { remoteWins, type LocalStore, type RemoteRow, type SyncTable } from '@/sync/engine';
+import { remoteWins, SYNC_TABLES, type LocalStore, type RemoteRow, type SyncTable } from '@/sync/engine';
 import { getMeta, setMeta } from './repo';
 
 /** Colunas sincronizadas de cada tabela (iguais no SQLite e no Supabase). */
 export const COLUMNS: Record<SyncTable, string[]> = {
   accounts: ['id', 'name', 'kind', 'opening_balance_cents', 'color', 'archived', 'created_at', 'updated_at', 'deleted_at'],
   categories: ['id', 'name', 'type', 'icon', 'color', 'archived', 'created_at', 'updated_at', 'deleted_at'],
+  credit_cards: [
+    'id', 'name', 'limit_cents', 'closing_day', 'due_day', 'account_id', 'color', 'archived',
+    'created_at', 'updated_at', 'deleted_at',
+  ],
   recurrences: [
     'id', 'type', 'description', 'amount_cents', 'category_id', 'account_id', 'day', 'start_month', 'end_month',
-    'notes', 'created_at', 'updated_at', 'deleted_at',
+    'notes', 'card_id', 'created_at', 'updated_at', 'deleted_at',
   ],
   transactions: [
     'id', 'type', 'description', 'amount_cents', 'date', 'paid', 'category_id', 'account_id', 'notes',
     'recurrence_id', 'occurrence_month', 'group_id', 'installment_number', 'installment_total',
-    'created_at', 'updated_at', 'deleted_at',
+    'card_id', 'invoice_month', 'invoice_payment', 'created_at', 'updated_at', 'deleted_at',
   ],
 };
 
-const BOOLEAN_COLUMNS = new Set(['archived', 'paid']);
+const BOOLEAN_COLUMNS = new Set(['archived', 'paid', 'invoice_payment']);
 
 type Row = Record<string, unknown>;
 
@@ -129,7 +133,7 @@ export async function resetSyncCursors(db: SQLiteDatabase) {
 /** Marca tudo como pendente de envio (primeiro login numa conta). */
 export async function markAllDirty(db: SQLiteDatabase) {
   await db.withTransactionAsync(async () => {
-    for (const t of ['accounts', 'categories', 'recurrences', 'transactions'] as const) {
+    for (const t of SYNC_TABLES) {
       await db.runAsync(`UPDATE ${t} SET dirty = 1`);
     }
   });

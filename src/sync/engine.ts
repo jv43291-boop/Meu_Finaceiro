@@ -9,7 +9,7 @@
  * interface, o que permite testar com implementações em memória.
  */
 
-export const SYNC_TABLES = ['accounts', 'categories', 'recurrences', 'transactions'] as const;
+export const SYNC_TABLES = ['accounts', 'categories', 'credit_cards', 'recurrences', 'transactions'] as const;
 export type SyncTable = (typeof SYNC_TABLES)[number];
 
 /** Linha no formato do servidor (colunas snake_case, booleanos de verdade). */

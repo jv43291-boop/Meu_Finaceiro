@@ -117,6 +117,9 @@ export function importLegacy(
     groupId: null,
     installmentNumber: null,
     installmentTotal: null,
+    cardId: null,
+    invoiceMonth: null,
+    invoicePayment: false,
   });
 
   const makeRule = (first: LegacyEntry, start: MonthKey, end: MonthKey | null): Recurrence => ({
@@ -133,6 +136,7 @@ export function importLegacy(
     startMonth: start,
     endMonth: end,
     notes: (first.notes ?? '').trim(),
+    cardId: null,
   });
 
   const transactions: Transaction[] = [];

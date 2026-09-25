@@ -2,16 +2,17 @@ import * as Crypto from 'expo-crypto';
 import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { applyChanges, loadAll, seedIfEmpty, upsertAccount, upsertCategory, type Snapshot } from '@/db/repo';
-import { currentMonthKey, type MonthKey } from '@/domain/dates';
+import { applyChanges, loadAll, seedIfEmpty, upsertAccount, upsertCard, upsertCategory, type Snapshot } from '@/db/repo';
+import { invoiceFor } from '@/domain/cards';
+import { currentMonthKey, todayISO, type DateISO, type MonthKey } from '@/domain/dates';
 import { emitLocalChange } from './events';
 import { importLegacy, parseLegacy, type ImportResult } from '@/domain/legacyImport';
 import {
-  createEntry, deleteItem, editItem, endRecurrence, togglePaid,
+  createEntry, deleteItem, editItem, endRecurrence, payInvoice, togglePaid,
   type Changes, type Ctx, type EntryInput, type EntryPatch, type Repeat,
 } from '@/domain/operations';
 import { virtualItem, type Scope } from '@/domain/recurrence';
-import type { Account, Category, ListItem, Recurrence } from '@/domain/types';
+import type { Account, Category, CreditCard, ListItem, Recurrence } from '@/domain/types';
 
 export const ctx: Ctx = {
   newId: () => Crypto.randomUUID(),
@@ -35,6 +36,10 @@ interface FinanceValue extends Snapshot {
   deleteRule: (rule: Recurrence) => Promise<void>;
   saveAccount: (a: Account) => Promise<void>;
   saveCategory: (c: Category) => Promise<void>;
+  cardById: Map<string, CreditCard>;
+  saveCard: (k: CreditCard) => Promise<void>;
+  /** paga a fatura (ou o que falta dela) saindo da conta escolhida */
+  payCardInvoice: (card: CreditCard, invoiceMonth: MonthKey, accountId: string | null, amountCents: number, date: DateISO) => Promise<void>;
   importOldApp: (raw: unknown) => Promise<ImportResult>;
   /** relê o banco (usado depois de baixar dados da nuvem) */
   reload: () => Promise<void>;
@@ -42,7 +47,7 @@ interface FinanceValue extends Snapshot {
 
 const FinanceContext = createContext<FinanceValue | null>(null);
 
-const EMPTY: Snapshot = { accounts: [], categories: [], recurrences: [], transactions: [] };
+const EMPTY: Snapshot = { accounts: [], categories: [], recurrences: [], transactions: [], cards: [] };
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
@@ -81,6 +86,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const value = useMemo<FinanceValue>(() => {
     const state = { transactions: snap.transactions, recurrences: snap.recurrences };
     const active = snap.accounts.filter((a) => !a.archived);
+    const cardCategoryId = snap.categories.find((c) => c.type === 'expense' && c.name === 'Cartão')?.id ?? null;
     return {
       ...snap,
       ready,
@@ -89,10 +95,24 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setSelectedMonth,
       accountById: new Map(snap.accounts.map((a) => [a.id, a])),
       categoryById: new Map(snap.categories.map((c) => [c.id, c])),
+      cardById: new Map(snap.cards.map((k) => [k.id, k])),
       defaultAccountId: active[0]?.id ?? snap.accounts[0]?.id ?? null,
       create: (input, repeat) => commit(createEntry(ctx, input, repeat)),
       edit: (item, patch, scope) => commit(editItem(ctx, state, item, patch, scope)),
-      toggle: (item) => commit(togglePaid(ctx, state, item)),
+      toggle: (item) => {
+        if (item.invoice && item.cardId && item.invoiceMonth) {
+          // tocar no círculo de uma fatura = pagar o que falta, pela conta do cartão, hoje
+          const card = snap.cards.find((k) => k.id === item.cardId);
+          if (!card) return Promise.resolve();
+          const inv = invoiceFor(card, item.invoiceMonth, { cards: snap.cards, ...state }, todayISO());
+          return commit(payInvoice(ctx, {
+            cardId: card.id, cardName: card.name, invoiceMonth: item.invoiceMonth,
+            accountId: card.accountId ?? active[0]?.id ?? null, amountCents: inv.totalCents, date: todayISO(),
+            categoryId: cardCategoryId, existing: inv.payment ?? undefined,
+          }));
+        }
+        return commit(togglePaid(ctx, state, item));
+      },
       remove: (item, scope) => commit(deleteItem(ctx, state, item, scope)),
       endRule: (rule, lastMonth) => commit(endRecurrence(ctx, rule, lastMonth)),
       saveRule: (rule) => commit({ transactions: [], recurrences: [{ ...rule, updatedAt: ctx.now() }] }),
@@ -101,6 +121,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         await upsertAccount(db, a);
         await reload();
         emitLocalChange();
+      },
+      saveCard: async (k) => {
+        await upsertCard(db, k);
+        await reload();
+        emitLocalChange();
+      },
+      payCardInvoice: (card, invoiceMonth, accountId, amountCents, date) => {
+        const inv = invoiceFor(card, invoiceMonth, { cards: snap.cards, ...state }, todayISO());
+        return commit(payInvoice(ctx, {
+          cardId: card.id, cardName: card.name, invoiceMonth, accountId, amountCents, date,
+          categoryId: cardCategoryId, existing: inv.payment ?? undefined,
+        }));
       },
       saveCategory: async (c) => {
         await upsertCategory(db, c);

@@ -35,6 +35,10 @@ export function transactionToItem(t: Transaction): ListItem {
     notes: t.notes,
     installmentNumber: t.installmentNumber,
     installmentTotal: t.installmentTotal,
+    cardId: t.cardId,
+    invoiceMonth: t.invoiceMonth,
+    invoice: false,
+    invoicePayment: t.invoicePayment,
   };
 }
 
@@ -55,6 +59,10 @@ export function virtualItem(rule: Recurrence, month: MonthKey): ListItem {
     notes: rule.notes,
     installmentNumber: null,
     installmentTotal: null,
+    cardId: rule.cardId,
+    invoiceMonth: null,
+    invoice: false,
+    invoicePayment: false,
   };
 }
 
