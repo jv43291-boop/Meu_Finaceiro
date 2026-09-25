@@ -41,7 +41,18 @@
       ],
       "expo-sqlite",
       "expo-font",
-      "expo-sharing",
+      [
+        "expo-sharing",
+        {
+          "android": {
+            "enabled": true,
+            "singleShareMimeTypes": [
+              "image/*",
+              "application/pdf"
+            ]
+          }
+        }
+      ],
       [
         "expo-notifications",
         {

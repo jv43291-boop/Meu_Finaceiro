@@ -13,7 +13,7 @@ import { useAppTheme } from '@/ui/theme';
 const THEME_LABEL = { system: 'Automático (segue o celular)', light: 'Claro', dark: 'Escuro' } as const;
 
 export default function MoreScreen() {
-  const { accounts, categories, transactions, cards, goals } = useFinance();
+  const { accounts, categories, transactions, cards, goals, payeeRules } = useFinance();
   const { preference } = useAppTheme();
   const cloud = useCloud();
   const reminders = useReminders();
@@ -30,6 +30,10 @@ export default function MoreScreen() {
       <T variant="title">Mais</T>
       <Card>
         <ListRow icon={cloud.status === 'error' ? 'cloud-alert-outline' : 'cloud-sync-outline'} title="Conta e sincronização" subtitle={cloudSubtitle} onPress={() => router.push('/nuvem')} />
+      </Card>
+      <Card>
+        <ListRow icon="receipt-text-outline" title="Lançar comprovante de Pix" subtitle="Lê o print ou PDF e desconta do saldo" onPress={() => router.push('/comprovante')} />
+        <ListRow icon="account-switch-outline" title="Regras de recebedores" subtitle={payeeRules.length ? `${payeeRules.length} regra(s) · ex.: José Ribeiro = Compra de pão` : 'Troque o nome da pessoa pelo que foi o gasto'} onPress={() => router.push('/recebedores')} />
       </Card>
       <Card>
         <ListRow icon="chart-box-outline" title="Relatórios" subtitle="Gastos por categoria e evolução mensal" onPress={() => router.push('/relatorios')} />

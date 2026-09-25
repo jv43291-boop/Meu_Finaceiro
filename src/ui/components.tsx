@@ -82,13 +82,14 @@ const VARIANT: Record<TextVariant, { size: number; weight: FontWeightName; spaci
 };
 
 export function T({
-  children, variant = 'body', color, style, numberOfLines, weight,
-}: { children: ReactNode; variant?: TextVariant; color?: string; style?: StyleProp<TextStyle>; numberOfLines?: number; weight?: FontWeightName }) {
+  children, variant = 'body', color, style, numberOfLines, weight, selectable,
+}: { children: ReactNode; variant?: TextVariant; color?: string; style?: StyleProp<TextStyle>; numberOfLines?: number; weight?: FontWeightName; selectable?: boolean }) {
   const c = useColors();
   const v = VARIANT[variant];
   return (
     <Text
       numberOfLines={numberOfLines}
+      selectable={selectable}
       style={[
         { fontFamily: fonts[weight ?? v.weight], fontSize: v.size, letterSpacing: v.spacing ?? 0, color: color ?? (v.muted ? c.muted : c.text) },
         v.upper && { textTransform: 'uppercase' },
