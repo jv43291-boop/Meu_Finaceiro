@@ -5,6 +5,8 @@ import { formatBRL } from '@/domain/money';
 import { totalBalance } from '@/domain/summary';
 import { useCloud } from '@/state/cloud';
 import { useFinance } from '@/state/finance';
+import { useLock } from '@/state/lock';
+import { useReminders } from '@/state/reminders';
 import { Card, ListRow, Screen, T } from '@/ui/components';
 import { useAppTheme } from '@/ui/theme';
 
@@ -14,6 +16,8 @@ export default function MoreScreen() {
   const { accounts, categories, transactions, cards, goals } = useFinance();
   const { preference } = useAppTheme();
   const cloud = useCloud();
+  const reminders = useReminders();
+  const lock = useLock();
   const cloudSubtitle = !cloud.configured
     ? 'Nuvem não configurada'
     : !cloud.session
@@ -38,14 +42,15 @@ export default function MoreScreen() {
         <ListRow icon="shape-outline" title="Categorias" subtitle={`${categories.length} categorias`} onPress={() => router.push('/categorias')} />
       </Card>
       <Card>
+        <ListRow icon="bell-outline" title="Lembretes" subtitle={reminders.supported ? (reminders.settings.enabled ? `Ligado · ${reminders.scheduled} aviso(s) agendado(s)` : 'Aviso antes de cada vencimento') : 'Disponível no celular'} onPress={() => router.push('/lembretes')} />
+        <ListRow icon="fingerprint" title="Bloqueio do app" subtitle={lock.enabled ? `Ligado · pede ${lock.methodLabel}` : 'Proteja com digital ou rosto'} onPress={() => router.push('/seguranca')} />
+        <ListRow icon="file-delimited-outline" title="Exportar para planilha" subtitle="CSV para Excel ou Google Planilhas" onPress={() => router.push('/exportar')} />
+      </Card>
+      <Card>
         <ListRow icon="palette-outline" title="Personalizar" subtitle={`Foto de fundo, cor e tema · ${THEME_LABEL[preference]}`} onPress={() => router.push('/aparencia')} />
       </Card>
       <Card>
         <ListRow icon="database-import-outline" title="Importar do app antigo" subtitle="Traz os lançamentos do backup do Meu Financeiro 1.0" onPress={() => router.push('/importar')} />
-      </Card>
-      <Card>
-        <T variant="label">Em breve</T>
-        <T variant="caption">Lembretes de vencimento, exportar para planilha e bloqueio com digital.</T>
       </Card>
       <T variant="caption" style={{ textAlign: 'center' }}>Live Finanças {Constants.expoConfig?.version ?? ''}</T>
     </Screen>

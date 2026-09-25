@@ -30,3 +30,5 @@ await png(svg({ scale: 0.8, mono: true }), 'android-icon-monochrome.png');
 // splash e favicon: ícone com cantos arredondados, fundo transparente
 await png(svg({ bg: VIOLETA, radius: 26 }), 'splash-icon.png');
 await png(svg({ bg: VIOLETA, radius: 26 }), 'favicon.png', 48);
+// ícone da notificação no Android: só a silhueta, branca sobre transparente
+await png(svg({ scale: 1, mono: true }), 'notification-icon.png', 96);

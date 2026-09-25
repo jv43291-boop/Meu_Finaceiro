@@ -15,6 +15,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
 import { CloudProvider } from '@/state/cloud';
 import { FinanceProvider, useFinance } from '@/state/finance';
+import { LockProvider } from '@/state/lock';
+import { RemindersProvider } from '@/state/reminders';
 import { T } from '@/ui/components';
 import { AppThemeProvider, fonts, useAppTheme } from '@/ui/theme';
 
@@ -52,6 +54,8 @@ function ThemedApp() {
     <ThemeProvider value={navTheme}>
       <FinanceProvider>
         <CloudProvider>
+        <RemindersProvider>
+        <LockProvider>
         <Gate>
           <Stack screenOptions={{ headerTintColor: c.text, headerStyle: { backgroundColor: c.background }, headerTitleStyle: { fontFamily: fonts.extrabold, fontSize: 17 }, headerShadowVisible: false, contentStyle: { backgroundColor: c.canvas } }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -70,10 +74,15 @@ function ThemedApp() {
             <Stack.Screen name="metas" options={{ title: 'Metas' }} />
             <Stack.Screen name="meta/[id]" options={{ title: 'Meta' }} />
             <Stack.Screen name="relatorios" options={{ title: 'Relatórios' }} />
+            <Stack.Screen name="lembretes" options={{ title: 'Lembretes' }} />
+            <Stack.Screen name="exportar" options={{ title: 'Exportar para planilha' }} />
+            <Stack.Screen name="seguranca" options={{ title: 'Bloqueio do app' }} />
             <Stack.Screen name="cartao/[id]" options={{ title: 'Cartão' }} />
             <Stack.Screen name="cartao/editar" options={{ title: 'Cartão', presentation: 'modal' }} />
           </Stack>
         </Gate>
+        </LockProvider>
+        </RemindersProvider>
         </CloudProvider>
       </FinanceProvider>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
