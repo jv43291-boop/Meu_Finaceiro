@@ -5,15 +5,22 @@ import { formatBRL } from '@/domain/money';
 import { totalBalance } from '@/domain/summary';
 import { useFinance } from '@/state/finance';
 import { Card, ListRow, Screen, T } from '@/ui/components';
+import { useAppTheme } from '@/ui/theme';
+
+const THEME_LABEL = { system: 'Automático (segue o celular)', light: 'Claro', dark: 'Escuro' } as const;
 
 export default function MoreScreen() {
   const { accounts, categories, transactions } = useFinance();
+  const { preference } = useAppTheme();
   return (
     <Screen>
       <T variant="title">Mais</T>
       <Card>
         <ListRow icon="wallet-outline" title="Contas" subtitle={`${accounts.length} conta(s) · ${formatBRL(totalBalance(accounts, transactions))}`} onPress={() => router.push('/contas')} />
         <ListRow icon="shape-outline" title="Categorias" subtitle={`${categories.length} categorias`} onPress={() => router.push('/categorias')} />
+      </Card>
+      <Card>
+        <ListRow icon="theme-light-dark" title="Aparência" subtitle={THEME_LABEL[preference]} onPress={() => router.push('/aparencia')} />
       </Card>
       <Card>
         <ListRow icon="database-import-outline" title="Importar do app antigo" subtitle="Traz os lançamentos do backup do Meu Financeiro 1.0" onPress={() => router.push('/importar')} />
