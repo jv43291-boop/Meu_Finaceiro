@@ -39,7 +39,8 @@ npm test
 
 ## Visual
 
-- Violeta `#5B45FF` como destaque, fonte Plus Jakarta Sans, tema claro e escuro (Mais → Aparência).
+- Violeta `#5B45FF` como destaque padrão, fonte Plus Jakarta Sans, tema claro e escuro.
+- **Mais → Personalizar**: foto de fundo da galeria, intensidade do véu (suave/médio/forte), desfoque, cor de destaque (violeta, azul, verde, rosa, laranja) e tema. A foto é reduzida para no máximo 1440 px e copiada para dentro do app; preenche a tela em qualquer proporção sem distorcer, e um véu na cor do tema mantém os textos legíveis. Se o arquivo sumir, o app volta ao fundo normal. Essas escolhas ficam só no aparelho (não sincronizam).
 - Ícone e splash saem de `assets/brand/logo.svg`. Depois de mudar o desenho, rode `npm run icons` para gerar os PNGs.
 - O Expo Go mostra o ícone dele; o ícone e o splash do Live só aparecem num build (`npx eas-cli@latest build -p android --profile preview`).
 

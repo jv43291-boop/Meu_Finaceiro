@@ -11,6 +11,7 @@ import { monthLabel, shiftMonth, type MonthKey } from '@/domain/dates';
 import { formatBRL } from '@/domain/money';
 import type { Scope } from '@/domain/recurrence';
 import type { EntryType } from '@/domain/types';
+import { AppBackground } from './AppBackground';
 import { fonts, radius, space, useColors, useHideValues, type Colors, type FontWeightName } from './theme';
 
 export type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
@@ -36,7 +37,9 @@ export function Screen({ children, scroll = true, padded = true }: { children: R
   const c = useColors();
   const inner = padded ? { padding: space.xl, gap: space.lg, paddingBottom: 48 } : undefined;
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={['top', 'left', 'right']}>
+      {/* cada tela desenha a própria foto: telas de abas ficam montadas por baixo e não podem ser transparentes */}
+      <AppBackground />
       {scroll ? (
         <ScrollView contentContainerStyle={inner} keyboardShouldPersistTaps="handled">{children}</ScrollView>
       ) : (

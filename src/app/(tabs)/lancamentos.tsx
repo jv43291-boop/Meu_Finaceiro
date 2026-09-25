@@ -9,6 +9,7 @@ import { summarizeItems } from '@/domain/summary';
 import type { ListItem } from '@/domain/types';
 import { useFinance } from '@/state/finance';
 import { Amount, Chip, Empty, Input, MonthSwitcher, T, cardShadow } from '@/ui/components';
+import { AppBackground } from '@/ui/AppBackground';
 import { ItemRow } from '@/ui/ItemRow';
 import { radius, space, useColors } from '@/ui/theme';
 
@@ -43,7 +44,8 @@ export default function EntriesScreen() {
   }, [transactions, recurrences, selectedMonth, filter, query, categoryById]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={['top', 'left', 'right']}>
+      <AppBackground />
       <View style={{ paddingHorizontal: space.xl, paddingTop: space.lg, gap: space.md }}>
         <MonthSwitcher month={selectedMonth} onChange={setSelectedMonth} />
         <View style={[{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg }, cardShadow(c)]}>
@@ -69,7 +71,7 @@ export default function EntriesScreen() {
           <T variant="label" style={{ marginTop: space.lg, marginBottom: space.xs }}>{formatDateLong(section.title)}</T>
         )}
         renderItem={({ item }) => (
-          <ItemRow item={item} onPress={() => router.push({ pathname: '/lancamento/[key]', params: { key: item.key } })} />
+          <ItemRow item={item} framed={c.hasBackground} onPress={() => router.push({ pathname: '/lancamento/[key]', params: { key: item.key } })} />
         )}
         ListEmptyComponent={
           <Empty

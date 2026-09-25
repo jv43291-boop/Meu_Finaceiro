@@ -47,13 +47,13 @@ function Gate({ children }: { children: ReactNode }) {
 function ThemedApp() {
   const { scheme, colors: c } = useAppTheme();
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
-  const navTheme = { ...base, colors: { ...base.colors, background: c.background, card: c.surface, text: c.text, border: c.border, primary: c.primary } };
+  const navTheme = { ...base, colors: { ...base.colors, background: c.canvas, card: c.surface, text: c.text, border: c.border, primary: c.primary } };
   return (
     <ThemeProvider value={navTheme}>
       <FinanceProvider>
         <CloudProvider>
         <Gate>
-          <Stack screenOptions={{ headerTintColor: c.text, headerStyle: { backgroundColor: c.background }, headerTitleStyle: { fontFamily: fonts.extrabold, fontSize: 17 }, headerShadowVisible: false, contentStyle: { backgroundColor: c.background } }}>
+          <Stack screenOptions={{ headerTintColor: c.text, headerStyle: { backgroundColor: c.background }, headerTitleStyle: { fontFamily: fonts.extrabold, fontSize: 17 }, headerShadowVisible: false, contentStyle: { backgroundColor: c.canvas } }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="lancamento/novo" options={{ title: 'Novo lançamento', presentation: 'modal' }} />
             <Stack.Screen name="lancamento/[key]" options={{ title: 'Lançamento' }} />
@@ -63,7 +63,7 @@ function ThemedApp() {
             <Stack.Screen name="categorias" options={{ title: 'Categorias' }} />
             <Stack.Screen name="categoria/[id]" options={{ title: 'Categoria', presentation: 'modal' }} />
             <Stack.Screen name="importar" options={{ title: 'Importar do app antigo' }} />
-            <Stack.Screen name="aparencia" options={{ title: 'Aparência' }} />
+            <Stack.Screen name="aparencia" options={{ title: 'Personalizar' }} />
             <Stack.Screen name="nuvem" options={{ title: 'Conta e sincronização' }} />
           </Stack>
         </Gate>

@@ -6,7 +6,8 @@ import { useFinance } from '@/state/finance';
 import { Amount, Icon, T, tapFeedback } from './components';
 import { space, useColors } from './theme';
 
-export function ItemRow({ item, onPress, showDate = false }: { item: ListItem; onPress: () => void; showDate?: boolean }) {
+/** framed: desenha o item sobre um cartão (usado quando há foto de fundo atrás da lista). */
+export function ItemRow({ item, onPress, showDate = false, framed = false }: { item: ListItem; onPress: () => void; showDate?: boolean; framed?: boolean }) {
   const c = useColors();
   const { categoryById, toggle } = useFinance();
   const cat = item.categoryId ? categoryById.get(item.categoryId) : undefined;
@@ -23,7 +24,12 @@ export function ItemRow({ item, onPress, showDate = false }: { item: ListItem; o
   const tint = cat?.color ?? c.muted;
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 6, opacity: pressed ? 0.7 : 1 })}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 6, opacity: pressed ? 0.7 : 1 },
+        framed && { backgroundColor: c.surface, borderRadius: 16, paddingHorizontal: space.md, paddingVertical: 8, marginBottom: 6 },
+      ]}>
       <View style={{ width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: tint + '22' }}>
         <Icon name={cat?.icon ?? 'tag-outline'} size={20} color={tint} />
       </View>

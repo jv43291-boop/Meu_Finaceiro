@@ -32,7 +32,7 @@ export default function MoreScreen() {
         <ListRow icon="shape-outline" title="Categorias" subtitle={`${categories.length} categorias`} onPress={() => router.push('/categorias')} />
       </Card>
       <Card>
-        <ListRow icon="theme-light-dark" title="Aparência" subtitle={THEME_LABEL[preference]} onPress={() => router.push('/aparencia')} />
+        <ListRow icon="palette-outline" title="Personalizar" subtitle={`Foto de fundo, cor e tema · ${THEME_LABEL[preference]}`} onPress={() => router.push('/aparencia')} />
       </Card>
       <Card>
         <ListRow icon="database-import-outline" title="Importar do app antigo" subtitle="Traz os lançamentos do backup do Meu Financeiro 1.0" onPress={() => router.push('/importar')} />

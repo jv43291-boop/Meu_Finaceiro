@@ -59,7 +59,51 @@ const dark: typeof light = {
   shadowOpacity: 0,
 };
 
-export type Colors = typeof light;
+export type Colors = typeof light & {
+  /** fundo das telas (sempre opaco; a foto, quando existe, é desenhada por cima dele em cada tela) */
+  canvas: string;
+  hasBackground: boolean;
+};
+
+/** Cores de destaque que a pessoa pode escolher. Todas com texto branco em contraste AA. */
+export const ACCENTS = {
+  violeta: {
+    label: 'Violeta',
+    light: { primary: '#5B45FF', primaryText: '#4A34F0', primarySoft: '#ECE9FF', hero: '#5B45FF' },
+    dark: { primary: '#6E5BFF', primaryText: '#A99BFF', primarySoft: '#221D4A', hero: '#4B38E0' },
+  },
+  azul: {
+    label: 'Azul',
+    light: { primary: '#2563EB', primaryText: '#1D4ED8', primarySoft: '#E3ECFF', hero: '#2563EB' },
+    dark: { primary: '#2F63E0', primaryText: '#9DB8FF', primarySoft: '#172746', hero: '#2A56D6' },
+  },
+  verde: {
+    label: 'Verde',
+    light: { primary: '#047857', primaryText: '#047857', primarySoft: '#DDF5EC', hero: '#047857' },
+    dark: { primary: '#0B7A57', primaryText: '#5EE0A8', primarySoft: '#12352A', hero: '#0B6E4F' },
+  },
+  rosa: {
+    label: 'Rosa',
+    light: { primary: '#BE185D', primaryText: '#BE185D', primarySoft: '#FCE4EF', hero: '#BE185D' },
+    dark: { primary: '#C42A6B', primaryText: '#F9A8D4', primarySoft: '#3D1528', hero: '#A3134F' },
+  },
+  laranja: {
+    label: 'Laranja',
+    light: { primary: '#C2410C', primaryText: '#C2410C', primarySoft: '#FDEBDD', hero: '#C2410C' },
+    dark: { primary: '#C4470F', primaryText: '#FDBA8C', primarySoft: '#3D200F', hero: '#B23A0A' },
+  },
+} as const;
+export type AccentName = keyof typeof ACCENTS;
+
+/** Quanto a foto é escurecida/clareada por trás do conteúdo. */
+export type BackgroundDim = 'soft' | 'medium' | 'strong';
+export const DIM_ALPHA: Record<BackgroundDim, number> = { soft: 0.62, medium: 0.76, strong: 0.88 };
+
+export interface BackgroundSettings {
+  uri: string | null;
+  dim: BackgroundDim;
+  blur: boolean;
+}
 export type ThemePreference = 'system' | 'light' | 'dark';
 export type Scheme = 'light' | 'dark';
 
@@ -78,6 +122,8 @@ export type FontWeightName = keyof typeof fonts;
 
 const THEME_KEY = 'theme';
 const HIDE_KEY = 'hide_values';
+const ACCENT_KEY = 'accent';
+const BG_KEY = 'background';
 
 interface ThemeValue {
   preference: ThemePreference;
@@ -87,9 +133,35 @@ interface ThemeValue {
   /** esconde os valores na tela (usar o app em público) */
   hideValues: boolean;
   toggleHideValues: () => void;
+  accent: AccentName;
+  setAccent: (a: AccentName) => void;
+  background: BackgroundSettings;
+  setBackground: (b: BackgroundSettings) => void;
 }
 
 const ThemeContext = createContext<ThemeValue | null>(null);
+
+const DEFAULT_BG: BackgroundSettings = { uri: null, dim: 'medium', blur: false };
+
+function parseBackground(raw: string | null): BackgroundSettings {
+  if (!raw) return DEFAULT_BG;
+  try {
+    const v = JSON.parse(raw);
+    return {
+      uri: typeof v.uri === 'string' ? v.uri : null,
+      dim: v.dim === 'soft' || v.dim === 'strong' ? v.dim : 'medium',
+      blur: v.blur === true,
+    };
+  } catch {
+    return DEFAULT_BG;
+  }
+}
+
+export function buildColors(scheme: Scheme, accent: AccentName, hasBackground: boolean): Colors {
+  const base = scheme === 'dark' ? dark : light;
+  const a = ACCENTS[accent][scheme];
+  return { ...base, ...a, canvas: base.background, hasBackground };
+}
 
 function isPreference(v: unknown): v is ThemePreference {
   return v === 'system' || v === 'light' || v === 'dark';
@@ -104,8 +176,16 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   const system = useColorScheme();
   const [preference, setPref] = useState<ThemePreference>('system');
   const [hideValues, setHide] = useState(false);
+  const [accent, setAccentState] = useState<AccentName>('violeta');
+  const [background, setBgState] = useState<BackgroundSettings>(DEFAULT_BG);
 
   useEffect(() => {
+    getMeta(db, ACCENT_KEY)
+      .then((v) => { if (v && v in ACCENTS) setAccentState(v as AccentName); })
+      .catch(() => undefined);
+    getMeta(db, BG_KEY)
+      .then((v) => setBgState(parseBackground(v)))
+      .catch(() => undefined);
     getMeta(db, THEME_KEY)
       .then((v) => { if (isPreference(v)) setPref(v); })
       .catch(() => undefined);
@@ -119,7 +199,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   }, [preference]);
 
   const scheme: Scheme = preference === 'system' ? (system === 'dark' ? 'dark' : 'light') : preference;
-  const colors = scheme === 'dark' ? dark : light;
+  const colors = useMemo(() => buildColors(scheme, accent, !!background.uri), [scheme, accent, background.uri]);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.background).catch(() => undefined);
@@ -139,9 +219,25 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     setMeta(db, HIDE_KEY, next ? '1' : '0').catch(() => undefined);
   }, [db, hideValues]);
 
+  const setAccent = useCallback(
+    (a: AccentName) => {
+      setAccentState(a);
+      setMeta(db, ACCENT_KEY, a).catch(() => undefined);
+    },
+    [db],
+  );
+
+  const setBackground = useCallback(
+    (b: BackgroundSettings) => {
+      setBgState(b);
+      setMeta(db, BG_KEY, JSON.stringify(b)).catch(() => undefined);
+    },
+    [db],
+  );
+
   const value = useMemo(
-    () => ({ preference, scheme, colors, setPreference, hideValues, toggleHideValues }),
-    [preference, scheme, colors, setPreference, hideValues, toggleHideValues],
+    () => ({ preference, scheme, colors, setPreference, hideValues, toggleHideValues, accent, setAccent, background, setBackground }),
+    [preference, scheme, colors, setPreference, hideValues, toggleHideValues, accent, setAccent, background, setBackground],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
@@ -162,5 +258,5 @@ export function useColors(): Colors {
   const v = useContext(ThemeContext);
   const system = useColorScheme();
   if (v) return v.colors;
-  return system === 'dark' ? dark : light;
+  return buildColors(system === 'dark' ? 'dark' : 'light', 'violeta', false);
 }
