@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { currentMonthKey, dayOf, daysInMonth, monthLabel, todayISO } from '@/domain/dates';
 import { currentInvoiceMonth, invoiceFor } from '@/domain/cards';
+import { budgetLevel, budgetLines, budgetTotals, goalPlan } from '@/domain/planning';
 import { cashItemsForMonth, overview, summarizeItems } from '@/domain/summary';
 import { useFinance } from '@/state/finance';
 import { Amount, Card, Empty, IconButton, ListRow, Pill, Screen, T } from '@/ui/components';
+import { BudgetBar } from '@/ui/Charts';
 import { ItemRow } from '@/ui/ItemRow';
 import { openItem } from '@/ui/nav';
 import { radius, space, useAppTheme, useColors } from '@/ui/theme';
@@ -21,19 +23,22 @@ function greeting(hour: number) {
 export default function HomeScreen() {
   const c = useColors();
   const { hideValues, toggleHideValues, scheme } = useAppTheme();
-  const { accounts, transactions, recurrences, cards } = useFinance();
+  const { accounts, transactions, recurrences, cards, categories, goals } = useFinance();
   const month = currentMonthKey();
   const today = todayISO();
 
-  const { ov, sum, cardRows } = useMemo(() => {
+  const { ov, sum, cardRows, budget, topGoal } = useMemo(() => {
     const ov = overview(accounts, transactions, recurrences, { today, upcomingDays: 7, cards });
     const sum = summarizeItems(cashItemsForMonth(month, transactions, recurrences, cards, today));
     const state = { cards, transactions, recurrences };
     const cardRows = cards
       .filter((k) => !k.archived)
       .map((k) => ({ card: k, invoice: invoiceFor(k, currentInvoiceMonth(k, today), state, today) }));
-    return { ov, sum, cardRows };
-  }, [accounts, transactions, recurrences, cards, month, today]);
+    const lines = budgetLines(month, categories, transactions, recurrences);
+    const budget = { totals: budgetTotals(lines), alerts: lines.filter((l) => l.level !== 'ok').slice(0, 3) };
+    const topGoal = goals.filter((g) => !g.archived && !goalPlan(g, today).done)[0] ?? null;
+    return { ov, sum, cardRows, budget, topGoal };
+  }, [accounts, transactions, recurrences, cards, categories, goals, month, today]);
 
   const daysLeft = daysInMonth(month) - dayOf(today);
   const lastDay = daysInMonth(month);
@@ -97,6 +102,35 @@ export default function HomeScreen() {
           ) : null}
         </Card>
       )}
+
+      {budget.totals.budgetCents > 0 || topGoal ? (
+        <Card style={{ gap: space.md }}>
+          <T variant="heading">Planejamento</T>
+          {budget.totals.budgetCents > 0 ? (
+            <Pressable onPress={() => router.push('/orcamentos')} style={{ gap: 6 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <T variant="bodyStrong">Orçamento do mês</T>
+                <Amount cents={budget.totals.plannedCents} />
+              </View>
+              <BudgetBar ratio={budget.totals.plannedCents / budget.totals.budgetCents} level={budgetLevel(budget.totals.plannedCents / budget.totals.budgetCents)} />
+              {budget.alerts.map((l) => (
+                <T key={l.category.id} variant="caption" color={l.level === 'over' ? c.danger : c.warning}>
+                  {l.category.name}: {Math.round(l.ratio * 100)}% do orçamento
+                </T>
+              ))}
+            </Pressable>
+          ) : null}
+          {topGoal ? (
+            <Pressable onPress={() => router.push({ pathname: '/meta/[id]', params: { id: topGoal.id } })} style={{ gap: 6 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <T variant="bodyStrong">{topGoal.name}</T>
+                <Amount cents={topGoal.savedCents} />
+              </View>
+              <BudgetBar ratio={goalPlan(topGoal, today).pct} level="ok" label={`${Math.round(goalPlan(topGoal, today).pct * 100)}% da meta`} />
+            </Pressable>
+          ) : null}
+        </Card>
+      ) : null}
 
       {cardRows.length > 0 ? (
         <Card style={{ gap: 4 }}>

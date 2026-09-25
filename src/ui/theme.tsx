@@ -31,6 +31,9 @@ const light = {
   danger: '#C7362F',
   overlay: 'rgba(14, 17, 22, 0.45)',
   shadowOpacity: 0.07,
+  /** par para gráficos receitas × despesas (validado para daltonismo nos dois temas) */
+  chartIncome: '#2A9D8F',
+  chartExpense: '#D9603F',
 };
 
 const dark: typeof light = {
@@ -57,6 +60,8 @@ const dark: typeof light = {
   danger: '#FF8A80',
   overlay: 'rgba(0, 0, 0, 0.6)',
   shadowOpacity: 0,
+  chartIncome: '#2A9D8F',
+  chartExpense: '#D9603F',
 };
 
 export type Colors = typeof light & {

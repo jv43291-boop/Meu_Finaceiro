@@ -66,6 +66,10 @@ function ThemedApp() {
             <Stack.Screen name="aparencia" options={{ title: 'Personalizar' }} />
             <Stack.Screen name="nuvem" options={{ title: 'Conta e sincronização' }} />
             <Stack.Screen name="cartoes" options={{ title: 'Cartões' }} />
+            <Stack.Screen name="orcamentos" options={{ title: 'Orçamentos' }} />
+            <Stack.Screen name="metas" options={{ title: 'Metas' }} />
+            <Stack.Screen name="meta/[id]" options={{ title: 'Meta' }} />
+            <Stack.Screen name="relatorios" options={{ title: 'Relatórios' }} />
             <Stack.Screen name="cartao/[id]" options={{ title: 'Cartão' }} />
             <Stack.Screen name="cartao/editar" options={{ title: 'Cartão', presentation: 'modal' }} />
           </Stack>

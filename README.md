@@ -48,7 +48,7 @@ npm test
 
 Os dados ficam no celular e sincronizam sozinhos com o Supabase: ao abrir o app, alguns segundos depois de cada alteração e a cada 5 minutos. Vence a alteração mais recente de cada registro.
 
-1. No Supabase (projeto `xnsajwmjezhabawctxla`), abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations` (`20260925000000_live_sync.sql` e depois `20260926000000_live_cards.sql`). Eles criam `accounts`, `categories`, `credit_cards`, `recurrences` e `transactions` com RLS por usuário e não mexe na tabela antiga `finance_backups`.
+1. No Supabase (projeto `xnsajwmjezhabawctxla`), abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations` (`20260925000000_live_sync.sql`, `20260926000000_live_cards.sql` e `20260927000000_live_planning.sql`). Eles criam `accounts`, `categories`, `credit_cards`, `goals`, `recurrences` e `transactions` com RLS por usuário e não mexe na tabela antiga `finance_backups`.
 2. Copie `.env.example` para `.env` e cole a chave **publishable** em `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Nunca use a chave secreta ou service_role no app.
 3. Reinicie o `npx expo start` e entre em **Mais → Conta e sincronização**.
 
@@ -62,6 +62,13 @@ Ao entrar com a mesma conta do app antigo, o Live encontra o backup em `finance_
 - Pagamento parcial ou compra lançada depois de pagar aparece como "restante".
 - Para sincronizar cartões, rode também `supabase/migrations/20260926000000_live_cards.sql`. `node scripts/verificar-supabase.mjs` confere tudo.
 
+## Planejamento
+
+- **Orçamentos** (Mais → Orçamentos): limite mensal por categoria de despesa. Conta tudo do mês pela data da despesa — o que foi pago, compras no cartão (pela data da compra) e contas fixas previstas; pagamento de fatura não entra, para não contar duas vezes. Aviso a partir de 80%, estourado acima de 100%, sempre com ícone e texto.
+- **Metas** (Mais → Metas): valor-alvo, quanto já tem e data opcional; mostra quanto guardar por mês. Guardar/retirar mudam só o valor da meta.
+- **Relatórios** (Mais → Relatórios): gastos por categoria no mês e receitas × despesas dos últimos 6 meses pelo fluxo de caixa (faturas no vencimento). As cores do gráfico foram validadas para daltonismo nos temas claro e escuro.
+- Para sincronizar orçamentos e metas, rode `supabase/migrations/20260927000000_live_planning.sql`.
+
 ## Importar do app antigo
 
 Em **Mais → Importar do app antigo**, escolha o JSON do backup (o `payload` da tabela `finance_backups`) ou cole o texto. Lançamentos recorrentes viram regras mensais de verdade.
@@ -71,5 +78,5 @@ Em **Mais → Importar do app antigo**, escolha o JSON do backup (o `payload` da
 1. ~~Base local: contas, categorias, lançamentos, recorrência, parcelas, importação~~
 2. ~~Login e sincronização automática com Supabase (tabelas novas + RLS)~~
 3. ~~Cartão de crédito e faturas~~
-4. Orçamentos, metas e relatórios
+4. ~~Orçamentos, metas e relatórios~~
 5. Lembretes de vencimento, exportar CSV, biometria

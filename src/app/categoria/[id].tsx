@@ -26,7 +26,7 @@ export default function CategoryForm() {
     const now = ctx.now();
     await f.saveCategory({
       id: existing?.id ?? ctx.newId(), createdAt: existing?.createdAt ?? now, updatedAt: now, deletedAt: null,
-      name: name.trim(), type, icon, color, archived,
+      name: name.trim(), type, icon, color, archived, budgetCents: existing?.budgetCents ?? null,
     });
     goBack();
   }
