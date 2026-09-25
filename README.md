@@ -37,6 +37,12 @@ npm test
 - **Saldo por conta** = saldo inicial + tudo que foi marcado como pago/recebido. Não existe "fechar mês": o saldo passa de um mês para o outro naturalmente, positivo ou negativo.
 - **Toda tabela tem `updated_at`, `deleted_at` e `dirty`**, prontos para a sincronização registro a registro da fase 2.
 
+## Visual
+
+- Violeta `#5B45FF` como destaque, fonte Plus Jakarta Sans, tema claro e escuro (Mais → Aparência).
+- Ícone e splash saem de `assets/brand/logo.svg`. Depois de mudar o desenho, rode `npm run icons` para gerar os PNGs.
+- O Expo Go mostra o ícone dele; o ícone e o splash do Live só aparecem num build (`npx eas-cli@latest build -p android --profile preview`).
+
 ## Importar do app antigo
 
 Em **Mais → Importar do app antigo**, escolha o JSON do backup (o `payload` da tabela `finance_backups`) ou cole o texto. Lançamentos recorrentes viram regras mensais de verdade.

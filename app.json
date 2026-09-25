@@ -8,11 +8,11 @@
     "scheme": "live",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#DDF7EF",
+        "backgroundColor": "#5B45FF",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -30,15 +30,17 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F3F1EA",
+          "backgroundColor": "#F6F7F9",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76,
+          "imageWidth": 110,
           "dark": {
-            "backgroundColor": "#0D1716"
+            "backgroundColor": "#0B0D12",
+            "image": "./assets/images/splash-icon.png"
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,

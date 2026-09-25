@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <!-- Live Finanças: um "L" cuja base vira uma linha de pulso subindo -->
+  <path d="M30 31 V77 H46 L54 65 L62 73 L72 54" fill="none" stroke="#FFFFFF" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="76" cy="46" r="6.5" fill="#C9FF4D"/>
+</svg>
