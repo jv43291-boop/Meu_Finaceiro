@@ -1,0 +1,157 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
+
+import { DEFAULT_ACCOUNT, DEFAULT_CATEGORIES } from '@/domain/defaults';
+import type { Changes } from '@/domain/operations';
+import type { Account, Category, Recurrence, Transaction } from '@/domain/types';
+
+type Row = Record<string, any>;
+
+const bool = (v: unknown) => v === 1 || v === true;
+
+const toAccount = (r: Row): Account => ({
+  id: r.id, name: r.name, kind: r.kind, openingBalanceCents: r.opening_balance_cents, color: r.color,
+  archived: bool(r.archived), createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
+});
+
+const toCategory = (r: Row): Category => ({
+  id: r.id, name: r.name, type: r.type, icon: r.icon, color: r.color, archived: bool(r.archived),
+  createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
+});
+
+const toRecurrence = (r: Row): Recurrence => ({
+  id: r.id, type: r.type, description: r.description, amountCents: r.amount_cents,
+  categoryId: r.category_id, accountId: r.account_id, day: r.day, startMonth: r.start_month,
+  endMonth: r.end_month, notes: r.notes, createdAt: r.created_at, updatedAt: r.updated_at,
+  deletedAt: r.deleted_at,
+});
+
+const toTransaction = (r: Row): Transaction => ({
+  id: r.id, type: r.type, description: r.description, amountCents: r.amount_cents, date: r.date,
+  paid: bool(r.paid), categoryId: r.category_id, accountId: r.account_id, notes: r.notes,
+  recurrenceId: r.recurrence_id, occurrenceMonth: r.occurrence_month, groupId: r.group_id,
+  installmentNumber: r.installment_number, installmentTotal: r.installment_total,
+  createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
+});
+
+export interface Snapshot {
+  accounts: Account[];
+  categories: Category[];
+  recurrences: Recurrence[];
+  /** inclui registros excluídos (marcadores de mês pulado) */
+  transactions: Transaction[];
+}
+
+export async function loadAll(db: SQLiteDatabase): Promise<Snapshot> {
+  const [a, c, r, t] = await Promise.all([
+    db.getAllAsync<Row>('SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY created_at'),
+    db.getAllAsync<Row>('SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY type DESC, name'),
+    db.getAllAsync<Row>('SELECT * FROM recurrences WHERE deleted_at IS NULL ORDER BY day, description'),
+    db.getAllAsync<Row>('SELECT * FROM transactions ORDER BY date'),
+  ]);
+  return {
+    accounts: a.map(toAccount),
+    categories: c.map(toCategory),
+    recurrences: r.map(toRecurrence),
+    transactions: t.map(toTransaction),
+  };
+}
+
+export async function upsertAccount(db: SQLiteDatabase, a: Account) {
+  await db.runAsync(
+    `INSERT INTO accounts (id, name, kind, opening_balance_cents, color, archived, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $name, $kind, $ob, $color, $archived, $ca, $ua, $da, 1)
+     ON CONFLICT(id) DO UPDATE SET name=$name, kind=$kind, opening_balance_cents=$ob, color=$color,
+       archived=$archived, updated_at=$ua, deleted_at=$da, dirty=1`,
+    {
+      $id: a.id, $name: a.name, $kind: a.kind, $ob: a.openingBalanceCents, $color: a.color,
+      $archived: a.archived ? 1 : 0, $ca: a.createdAt, $ua: a.updatedAt, $da: a.deletedAt,
+    },
+  );
+}
+
+export async function upsertCategory(db: SQLiteDatabase, c: Category) {
+  await db.runAsync(
+    `INSERT INTO categories (id, name, type, icon, color, archived, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $name, $type, $icon, $color, $archived, $ca, $ua, $da, 1)
+     ON CONFLICT(id) DO UPDATE SET name=$name, type=$type, icon=$icon, color=$color,
+       archived=$archived, updated_at=$ua, deleted_at=$da, dirty=1`,
+    {
+      $id: c.id, $name: c.name, $type: c.type, $icon: c.icon, $color: c.color,
+      $archived: c.archived ? 1 : 0, $ca: c.createdAt, $ua: c.updatedAt, $da: c.deletedAt,
+    },
+  );
+}
+
+async function upsertRecurrence(db: SQLiteDatabase, r: Recurrence) {
+  await db.runAsync(
+    `INSERT INTO recurrences (id, type, description, amount_cents, category_id, account_id, day, start_month,
+       end_month, notes, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $type, $desc, $amt, $cat, $acc, $day, $start, $end, $notes, $ca, $ua, $da, 1)
+     ON CONFLICT(id) DO UPDATE SET type=$type, description=$desc, amount_cents=$amt, category_id=$cat,
+       account_id=$acc, day=$day, start_month=$start, end_month=$end, notes=$notes, updated_at=$ua,
+       deleted_at=$da, dirty=1`,
+    {
+      $id: r.id, $type: r.type, $desc: r.description, $amt: r.amountCents, $cat: r.categoryId,
+      $acc: r.accountId, $day: r.day, $start: r.startMonth, $end: r.endMonth, $notes: r.notes,
+      $ca: r.createdAt, $ua: r.updatedAt, $da: r.deletedAt,
+    },
+  );
+}
+
+async function upsertTransaction(db: SQLiteDatabase, t: Transaction) {
+  await db.runAsync(
+    `INSERT INTO transactions (id, type, description, amount_cents, date, paid, category_id, account_id, notes,
+       recurrence_id, occurrence_month, group_id, installment_number, installment_total,
+       created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $type, $desc, $amt, $date, $paid, $cat, $acc, $notes, $rec, $occ, $grp, $in, $it, $ca, $ua, $da, 1)
+     ON CONFLICT(id) DO UPDATE SET type=$type, description=$desc, amount_cents=$amt, date=$date, paid=$paid,
+       category_id=$cat, account_id=$acc, notes=$notes, recurrence_id=$rec, occurrence_month=$occ,
+       group_id=$grp, installment_number=$in, installment_total=$it, updated_at=$ua, deleted_at=$da, dirty=1`,
+    {
+      $id: t.id, $type: t.type, $desc: t.description, $amt: t.amountCents, $date: t.date,
+      $paid: t.paid ? 1 : 0, $cat: t.categoryId, $acc: t.accountId, $notes: t.notes,
+      $rec: t.recurrenceId, $occ: t.occurrenceMonth, $grp: t.groupId, $in: t.installmentNumber,
+      $it: t.installmentTotal, $ca: t.createdAt, $ua: t.updatedAt, $da: t.deletedAt,
+    },
+  );
+}
+
+/** Aplica um conjunto de mudanças numa transação só: ou grava tudo, ou nada. */
+export async function applyChanges(db: SQLiteDatabase, changes: Changes, extra?: { categories?: Category[] }) {
+  await db.withTransactionAsync(async () => {
+    for (const c of extra?.categories ?? []) await upsertCategory(db, c);
+    // regras antes das ocorrências
+    for (const r of changes.recurrences) await upsertRecurrence(db, r);
+    for (const t of changes.transactions) await upsertTransaction(db, t);
+  });
+}
+
+/** Cria conta e categorias padrão no primeiro uso. */
+export async function seedIfEmpty(db: SQLiteDatabase, newId: () => string, now: string) {
+  const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM accounts');
+  if ((row?.n ?? 0) > 0) return;
+  await db.withTransactionAsync(async () => {
+    await upsertAccount(db, {
+      id: newId(), name: DEFAULT_ACCOUNT.name, kind: DEFAULT_ACCOUNT.kind, openingBalanceCents: 0,
+      color: DEFAULT_ACCOUNT.color, archived: false, createdAt: now, updatedAt: now, deletedAt: null,
+    });
+    for (const c of DEFAULT_CATEGORIES) {
+      await upsertCategory(db, {
+        id: newId(), name: c.name, type: c.type, icon: c.icon, color: c.color, archived: false,
+        createdAt: now, updatedAt: now, deletedAt: null,
+      });
+    }
+  });
+}
+
+export async function getMeta(db: SQLiteDatabase, key: string): Promise<string | null> {
+  const r = await db.getFirstAsync<{ value: string }>('SELECT value FROM meta WHERE key = ?', key);
+  return r?.value ?? null;
+}
+
+export async function setMeta(db: SQLiteDatabase, key: string, value: string) {
+  await db.runAsync(
+    'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    key, value,
+  );
+}
