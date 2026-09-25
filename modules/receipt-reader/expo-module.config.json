@@ -1,0 +1,9 @@
+{
+  "platforms": ["android", "apple"],
+  "apple": {
+    "modules": ["ReceiptReaderModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.receiptreader.ReceiptReaderModule"]
+  }
+}
