@@ -36,6 +36,19 @@ export interface Category extends SyncFields {
   icon: string;
   color: string;
   archived: boolean;
+  /** orçamento mensal (só despesas); null = sem orçamento */
+  budgetCents: number | null;
+}
+
+export interface Goal extends SyncFields {
+  name: string;
+  targetCents: number;
+  savedCents: number;
+  /** data-alvo opcional (YYYY-MM-DD) */
+  targetDate: string | null;
+  icon: string;
+  color: string;
+  archived: boolean;
 }
 
 /**

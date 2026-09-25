@@ -2,7 +2,7 @@ import * as Crypto from 'expo-crypto';
 import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { applyChanges, loadAll, seedIfEmpty, upsertAccount, upsertCard, upsertCategory, type Snapshot } from '@/db/repo';
+import { applyChanges, loadAll, seedIfEmpty, upsertAccount, upsertCard, upsertCategory, upsertGoal, type Snapshot } from '@/db/repo';
 import { invoiceFor } from '@/domain/cards';
 import { currentMonthKey, todayISO, type DateISO, type MonthKey } from '@/domain/dates';
 import { emitLocalChange } from './events';
@@ -12,7 +12,7 @@ import {
   type Changes, type Ctx, type EntryInput, type EntryPatch, type Repeat,
 } from '@/domain/operations';
 import { virtualItem, type Scope } from '@/domain/recurrence';
-import type { Account, Category, CreditCard, ListItem, Recurrence } from '@/domain/types';
+import type { Account, Category, CreditCard, Goal, ListItem, Recurrence } from '@/domain/types';
 
 export const ctx: Ctx = {
   newId: () => Crypto.randomUUID(),
@@ -37,6 +37,7 @@ interface FinanceValue extends Snapshot {
   saveAccount: (a: Account) => Promise<void>;
   saveCategory: (c: Category) => Promise<void>;
   cardById: Map<string, CreditCard>;
+  saveGoal: (g: Goal) => Promise<void>;
   saveCard: (k: CreditCard) => Promise<void>;
   /** paga a fatura (ou o que falta dela) saindo da conta escolhida */
   payCardInvoice: (card: CreditCard, invoiceMonth: MonthKey, accountId: string | null, amountCents: number, date: DateISO) => Promise<void>;
@@ -47,7 +48,7 @@ interface FinanceValue extends Snapshot {
 
 const FinanceContext = createContext<FinanceValue | null>(null);
 
-const EMPTY: Snapshot = { accounts: [], categories: [], recurrences: [], transactions: [], cards: [] };
+const EMPTY: Snapshot = { accounts: [], categories: [], recurrences: [], transactions: [], cards: [], goals: [] };
 
 export function FinanceProvider({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
@@ -119,6 +120,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       deleteRule: (rule) => commit(deleteItem(ctx, state, virtualItem(rule, rule.startMonth), 'all')),
       saveAccount: async (a) => {
         await upsertAccount(db, a);
+        await reload();
+        emitLocalChange();
+      },
+      saveGoal: async (g) => {
+        await upsertGoal(db, g);
         await reload();
         emitLocalChange();
       },

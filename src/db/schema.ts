@@ -107,7 +107,25 @@ const MIGRATIONS: string[] = [
   ALTER TABLE transactions ADD COLUMN invoice_payment INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE recurrences ADD COLUMN card_id TEXT;
   CREATE INDEX idx_transactions_card ON transactions (card_id, invoice_month);
+  `,
+  // 3: orçamento por categoria e metas
   `
+  ALTER TABLE categories ADD COLUMN budget_cents INTEGER;
+  CREATE TABLE goals (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    target_cents INTEGER NOT NULL,
+    saved_cents INTEGER NOT NULL DEFAULT 0,
+    target_date TEXT,
+    icon TEXT NOT NULL DEFAULT 'piggy-bank-outline',
+    color TEXT NOT NULL DEFAULT '#5B45FF',
+    archived INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    dirty INTEGER NOT NULL DEFAULT 1
+  );
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {

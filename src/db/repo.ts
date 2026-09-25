@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { DEFAULT_ACCOUNT, DEFAULT_CATEGORIES } from '@/domain/defaults';
 import { stableId } from '@/domain/ids';
 import type { Changes } from '@/domain/operations';
-import type { Account, Category, CreditCard, Recurrence, Transaction } from '@/domain/types';
+import type { Account, Category, CreditCard, Goal, Recurrence, Transaction } from '@/domain/types';
 
 type Row = Record<string, any>;
 
@@ -16,7 +16,7 @@ const toAccount = (r: Row): Account => ({
 
 const toCategory = (r: Row): Category => ({
   id: r.id, name: r.name, type: r.type, icon: r.icon, color: r.color, archived: bool(r.archived),
-  createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
+  budgetCents: r.budget_cents ?? null, createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
 });
 
 const toRecurrence = (r: Row): Recurrence => ({
@@ -24,6 +24,12 @@ const toRecurrence = (r: Row): Recurrence => ({
   categoryId: r.category_id, accountId: r.account_id, day: r.day, startMonth: r.start_month,
   endMonth: r.end_month, notes: r.notes, cardId: r.card_id ?? null, createdAt: r.created_at, updatedAt: r.updated_at,
   deletedAt: r.deleted_at,
+});
+
+const toGoal = (r: Row): Goal => ({
+  id: r.id, name: r.name, targetCents: r.target_cents, savedCents: r.saved_cents, targetDate: r.target_date,
+  icon: r.icon, color: r.color, archived: bool(r.archived),
+  createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
 });
 
 const toCard = (r: Row): CreditCard => ({
@@ -48,15 +54,17 @@ export interface Snapshot {
   /** inclui registros excluídos (marcadores de mês pulado) */
   transactions: Transaction[];
   cards: CreditCard[];
+  goals: Goal[];
 }
 
 export async function loadAll(db: SQLiteDatabase): Promise<Snapshot> {
-  const [a, c, r, t, k] = await Promise.all([
+  const [a, c, r, t, k, g] = await Promise.all([
     db.getAllAsync<Row>('SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY created_at'),
     db.getAllAsync<Row>('SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY type DESC, name'),
     db.getAllAsync<Row>('SELECT * FROM recurrences WHERE deleted_at IS NULL ORDER BY day, description'),
     db.getAllAsync<Row>('SELECT * FROM transactions ORDER BY date'),
     db.getAllAsync<Row>('SELECT * FROM credit_cards WHERE deleted_at IS NULL ORDER BY created_at'),
+    db.getAllAsync<Row>('SELECT * FROM goals WHERE deleted_at IS NULL ORDER BY created_at'),
   ]);
   return {
     accounts: a.map(toAccount),
@@ -64,6 +72,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<Snapshot> {
     recurrences: r.map(toRecurrence),
     transactions: t.map(toTransaction),
     cards: k.map(toCard),
+    goals: g.map(toGoal),
   };
 }
 
@@ -95,13 +104,26 @@ export async function upsertCard(db: SQLiteDatabase, k: CreditCard) {
 
 export async function upsertCategory(db: SQLiteDatabase, c: Category) {
   await db.runAsync(
-    `INSERT INTO categories (id, name, type, icon, color, archived, created_at, updated_at, deleted_at, dirty)
-     VALUES ($id, $name, $type, $icon, $color, $archived, $ca, $ua, $da, 1)
+    `INSERT INTO categories (id, name, type, icon, color, archived, budget_cents, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $name, $type, $icon, $color, $archived, $budget, $ca, $ua, $da, 1)
      ON CONFLICT(id) DO UPDATE SET name=$name, type=$type, icon=$icon, color=$color,
-       archived=$archived, updated_at=$ua, deleted_at=$da, dirty=1`,
+       archived=$archived, budget_cents=$budget, updated_at=$ua, deleted_at=$da, dirty=1`,
     {
       $id: c.id, $name: c.name, $type: c.type, $icon: c.icon, $color: c.color,
-      $archived: c.archived ? 1 : 0, $ca: c.createdAt, $ua: c.updatedAt, $da: c.deletedAt,
+      $archived: c.archived ? 1 : 0, $budget: c.budgetCents, $ca: c.createdAt, $ua: c.updatedAt, $da: c.deletedAt,
+    },
+  );
+}
+
+export async function upsertGoal(db: SQLiteDatabase, g: Goal) {
+  await db.runAsync(
+    `INSERT INTO goals (id, name, target_cents, saved_cents, target_date, icon, color, archived, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $name, $target, $saved, $date, $icon, $color, $archived, $ca, $ua, $da, 1)
+     ON CONFLICT(id) DO UPDATE SET name=$name, target_cents=$target, saved_cents=$saved, target_date=$date, icon=$icon,
+       color=$color, archived=$archived, updated_at=$ua, deleted_at=$da, dirty=1`,
+    {
+      $id: g.id, $name: g.name, $target: g.targetCents, $saved: g.savedCents, $date: g.targetDate, $icon: g.icon,
+      $color: g.color, $archived: g.archived ? 1 : 0, $ca: g.createdAt, $ua: g.updatedAt, $da: g.deletedAt,
     },
   );
 }
@@ -163,7 +185,7 @@ export async function seedIfEmpty(db: SQLiteDatabase, _newId: () => string, now:
     });
     for (const c of DEFAULT_CATEGORIES) {
       await upsertCategory(db, {
-        id: stableId(`seed:category:${c.type}:${c.name}`), name: c.name, type: c.type, icon: c.icon, color: c.color, archived: false,
+        id: stableId(`seed:category:${c.type}:${c.name}`), name: c.name, type: c.type, icon: c.icon, color: c.color, archived: false, budgetCents: null,
         createdAt: now, updatedAt: now, deletedAt: null,
       });
     }

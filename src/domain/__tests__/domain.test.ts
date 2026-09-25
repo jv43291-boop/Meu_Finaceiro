@@ -168,8 +168,8 @@ describe('importação do app antigo', () => {
     ],
   };
   const cats: Category[] = [
-    { id: 'edu', createdAt: '', updatedAt: '', deletedAt: null, name: 'Educação', type: 'expense', icon: '', color: '', archived: false },
-    { id: 'sal', createdAt: '', updatedAt: '', deletedAt: null, name: 'Salário', type: 'income', icon: '', color: '', archived: false },
+    { id: 'edu', createdAt: '', updatedAt: '', deletedAt: null, name: 'Educação', type: 'expense', icon: '', color: '', archived: false, budgetCents: null },
+    { id: 'sal', createdAt: '', updatedAt: '', deletedAt: null, name: 'Salário', type: 'income', icon: '', color: '', archived: false, budgetCents: null },
   ];
 
   it('converte grupos e recorrentes em regras', () => {

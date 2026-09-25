@@ -92,7 +92,7 @@ export function importLegacy(
     if (found) return found;
     const cat: Category = {
       id: ctx.newId(), createdAt: now, updatedAt: now, deletedAt: null,
-      name: n, type, icon: 'tag-outline', color: '#8A9491', archived: false,
+      name: n, type, icon: 'tag-outline', color: '#8A9491', archived: false, budgetCents: null,
     };
     newCategories.push(cat);
     catIndex.set(key, cat.id);

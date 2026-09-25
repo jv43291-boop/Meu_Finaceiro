@@ -6,7 +6,8 @@ import { getMeta, setMeta } from './repo';
 /** Colunas sincronizadas de cada tabela (iguais no SQLite e no Supabase). */
 export const COLUMNS: Record<SyncTable, string[]> = {
   accounts: ['id', 'name', 'kind', 'opening_balance_cents', 'color', 'archived', 'created_at', 'updated_at', 'deleted_at'],
-  categories: ['id', 'name', 'type', 'icon', 'color', 'archived', 'created_at', 'updated_at', 'deleted_at'],
+  categories: ['id', 'name', 'type', 'icon', 'color', 'archived', 'budget_cents', 'created_at', 'updated_at', 'deleted_at'],
+  goals: ['id', 'name', 'target_cents', 'saved_cents', 'target_date', 'icon', 'color', 'archived', 'created_at', 'updated_at', 'deleted_at'],
   credit_cards: [
     'id', 'name', 'limit_cents', 'closing_day', 'due_day', 'account_id', 'color', 'archived',
     'created_at', 'updated_at', 'deleted_at',
