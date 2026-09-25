@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { SectionList, View } from 'react-native';
+import { ScrollView, SectionList, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatDateLong } from '@/domain/dates';
@@ -8,7 +8,7 @@ import { itemsForMonth } from '@/domain/recurrence';
 import { summarizeItems } from '@/domain/summary';
 import type { ListItem } from '@/domain/types';
 import { useFinance } from '@/state/finance';
-import { Amount, Chip, Empty, Fab, Input, MonthSwitcher, T } from '@/ui/components';
+import { Amount, Chip, Empty, Input, MonthSwitcher, T, cardShadow } from '@/ui/components';
 import { ItemRow } from '@/ui/ItemRow';
 import { radius, space, useColors } from '@/ui/theme';
 
@@ -44,29 +44,29 @@ export default function EntriesScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.background }} edges={['top', 'left', 'right']}>
-      <View style={{ padding: space.lg, gap: space.md }}>
+      <View style={{ paddingHorizontal: space.xl, paddingTop: space.lg, gap: space.md }}>
         <MonthSwitcher month={selectedMonth} onChange={setSelectedMonth} />
-        <View style={{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: radius.lg, padding: space.md, borderWidth: 1, borderColor: c.border }}>
+        <View style={[{ flexDirection: 'row', backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg }, cardShadow(c)]}>
           <Stat label="Receitas" cents={summary.income} type="income" />
           <Stat label="Despesas" cents={summary.expense} type="expense" />
-          <Stat label="Saldo" cents={Math.abs(summary.result)} type={summary.result >= 0 ? 'income' : 'expense'} />
+          <Stat label="Resultado" cents={Math.abs(summary.result)} type={summary.result >= 0 ? 'income' : 'expense'} />
         </View>
-        <Input placeholder="Buscar por descrição, categoria ou observação" value={query} onChangeText={setQuery} returnKeyType="search" />
-        <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
+        <Input placeholder="Buscar descrição, categoria ou nota" value={query} onChangeText={setQuery} returnKeyType="search" />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
           <Chip label="Todos" selected={filter === 'all'} onPress={() => setFilter('all')} />
           <Chip label="Receitas" selected={filter === 'income'} onPress={() => setFilter('income')} color={c.income} />
           <Chip label="Despesas" selected={filter === 'expense'} onPress={() => setFilter('expense')} color={c.expense} />
           <Chip label="Pendentes" selected={filter === 'pending'} onPress={() => setFilter('pending')} color={c.warning} />
-        </View>
+        </ScrollView>
       </View>
 
       <SectionList
         sections={sections}
         keyExtractor={(it) => it.key}
-        contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingHorizontal: space.xl, paddingBottom: 40 }}
         stickySectionHeadersEnabled={false}
         renderSectionHeader={({ section }) => (
-          <T variant="label" style={{ marginTop: space.md, marginBottom: space.xs }}>{formatDateLong(section.title)}</T>
+          <T variant="label" style={{ marginTop: space.lg, marginBottom: space.xs }}>{formatDateLong(section.title)}</T>
         )}
         renderItem={({ item }) => (
           <ItemRow item={item} onPress={() => router.push({ pathname: '/lancamento/[key]', params: { key: item.key } })} />
@@ -79,14 +79,13 @@ export default function EntriesScreen() {
           />
         }
       />
-      <Fab onPress={() => router.push('/lancamento/novo')} />
     </SafeAreaView>
   );
 }
 
 function Stat({ label, cents, type }: { label: string; cents: number; type: 'income' | 'expense' }) {
   return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
+    <View style={{ flex: 1, alignItems: 'center', gap: 4 }}>
       <T variant="caption">{label}</T>
       <Amount cents={cents} type={type} />
     </View>

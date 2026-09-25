@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 
 import { addDays, formatDateBR, parseDateBR, todayISO, type DateISO } from '@/domain/dates';
 import { formatPlain, parseMoney } from '@/domain/money';
@@ -9,7 +9,7 @@ import type { EntryType, ListItem } from '@/domain/types';
 import { useFinance } from '@/state/finance';
 import { Button, Chip, Field, Input, ScopeSheet, Segmented, SwitchRow, T } from './components';
 import { confirmAsk, notify } from './dialogs';
-import { space, useColors } from './theme';
+import { fonts, space, useColors } from './theme';
 
 type RepeatKind = Repeat['kind'];
 
@@ -136,16 +136,30 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: space.xl, gap: space.xl, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         <Segmented
           value={type}
           onChange={(t) => { setType(t); setCategoryId(null); }}
           options={[{ value: 'expense', label: 'Despesa', color: c.expense }, { value: 'income', label: 'Receita', color: c.income }]}
         />
 
-        <Field label="Valor (R$)">
-          <Input large value={amount} onChangeText={setAmount} placeholder="0,00" keyboardType="decimal-pad" autoFocus={!editing} style={{ color: typeColor }} />
-        </Field>
+        <View style={{ alignItems: 'center', gap: 4, paddingVertical: space.sm }}>
+          <T variant="caption">Valor</T>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <T variant="title" color={c.muted}>R$</T>
+            <TextInput
+              accessibilityLabel="Valor em reais"
+              value={amount}
+              onChangeText={setAmount}
+              placeholder="0,00"
+              placeholderTextColor={c.muted}
+              keyboardType="decimal-pad"
+              autoFocus={!editing}
+              selectionColor={c.primary}
+              style={[{ minWidth: 140, fontSize: 46, fontFamily: fonts.extrabold, letterSpacing: -1, color: typeColor, textAlign: 'center', paddingVertical: 4 }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]}
+            />
+          </View>
+        </View>
 
         <Field label="Descrição">
           <Input value={description} onChangeText={setDescription} placeholder={type === 'income' ? 'Ex.: Salário' : 'Ex.: Aluguel'} />
@@ -178,8 +192,8 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
         )}
 
         <Field label={repeat === 'none' || editing ? 'Data' : 'Primeira data'}>
-          <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
-            <Input value={dateText} onChangeText={onDateText} placeholder="dd/mm/aaaa" keyboardType="numbers-and-punctuation" style={{ flex: 1 }} />
+          <Input value={dateText} onChangeText={onDateText} placeholder="dd/mm/aaaa" keyboardType="numbers-and-punctuation" />
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
             <Chip label="Hoje" selected={date === todayISO()} onPress={() => pickDate(todayISO())} />
             <Chip label="Ontem" selected={date === addDays(todayISO(), -1)} onPress={() => pickDate(addDays(todayISO(), -1))} />
           </View>

@@ -6,7 +6,7 @@ import { currentMonthKey, monthDiff, shortMonthLabel } from '@/domain/dates';
 import { occursIn } from '@/domain/recurrence';
 import type { Recurrence } from '@/domain/types';
 import { useFinance } from '@/state/finance';
-import { Amount, Card, Empty, Fab, ListRow, Screen, T } from '@/ui/components';
+import { Amount, Card, Empty, ListRow, Screen, T } from '@/ui/components';
 import { useColors } from '@/ui/theme';
 
 export default function RecurrencesScreen() {
@@ -44,9 +44,8 @@ export default function RecurrencesScreen() {
   };
 
   return (
-    <View style={{ flex: 1 }}>
-      <Screen>
-        <T variant="title">Fixos do mês</T>
+    <Screen>
+        <T variant="title">Fixos</T>
         <T variant="caption">
           Receitas e contas que se repetem. Elas aparecem sozinhas em todos os meses; você só marca como pago.
         </T>
@@ -55,6 +54,11 @@ export default function RecurrencesScreen() {
           <Empty icon="calendar-sync-outline" title="Nenhuma recorrência" text='Ao criar um lançamento, escolha "Todo mês" em Repetição.' />
         ) : (
           <>
+            <View style={{ backgroundColor: c.hero, borderRadius: 22, padding: 20, gap: 6 }}>
+              <T variant="caption" color={c.heroMuted}>Sobra fixa por mês</T>
+              <Amount size="title" cents={groups.incomeTotal - groups.expenseTotal} color={groups.incomeTotal >= groups.expenseTotal ? c.spark : '#FFB4AD'} />
+              <T variant="caption" color={c.heroMuted}>Receitas fixas menos despesas fixas deste mês.</T>
+            </View>
             <Card>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <T variant="heading">Receitas fixas</T>
@@ -69,11 +73,6 @@ export default function RecurrencesScreen() {
               </View>
               {groups.expense.length ? groups.expense.map(row) : <T variant="caption">Nenhuma.</T>}
             </Card>
-            <Card>
-              <T variant="label">Sobra fixa por mês</T>
-              <Amount size="amount" cents={Math.abs(groups.incomeTotal - groups.expenseTotal)} type={groups.incomeTotal >= groups.expenseTotal ? 'income' : 'expense'} />
-              <T variant="caption" color={c.muted}>Receitas fixas menos despesas fixas deste mês.</T>
-            </Card>
             {groups.ended.length > 0 && (
               <Card>
                 <T variant="heading">Encerradas</T>
@@ -82,8 +81,6 @@ export default function RecurrencesScreen() {
             )}
           </>
         )}
-      </Screen>
-      <Fab onPress={() => router.push('/lancamento/novo')} />
-    </View>
+    </Screen>
   );
 }

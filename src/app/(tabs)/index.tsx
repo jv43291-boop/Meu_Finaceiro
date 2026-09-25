@@ -2,104 +2,121 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 
-import { currentMonthKey, monthLabel, todayISO } from '@/domain/dates';
-import { formatBRL } from '@/domain/money';
+import { currentMonthKey, dayOf, daysInMonth, monthLabel, todayISO } from '@/domain/dates';
 import { itemsForMonth } from '@/domain/recurrence';
 import { overview, summarizeItems } from '@/domain/summary';
 import { useFinance } from '@/state/finance';
-import { Amount, Card, Empty, Fab, Screen, T } from '@/ui/components';
+import { Amount, Card, Empty, IconButton, Pill, Screen, T } from '@/ui/components';
 import { ItemRow } from '@/ui/ItemRow';
-import { space, useColors } from '@/ui/theme';
+import { radius, space, useAppTheme, useColors } from '@/ui/theme';
+
+function greeting(hour: number) {
+  if (hour < 5) return 'Boa noite';
+  if (hour < 12) return 'Bom dia';
+  if (hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
 
 export default function HomeScreen() {
   const c = useColors();
+  const { hideValues, toggleHideValues, scheme } = useAppTheme();
   const { accounts, transactions, recurrences } = useFinance();
   const month = currentMonthKey();
+  const today = todayISO();
 
-  const data = useMemo(() => {
-    const ov = overview(accounts, transactions, recurrences, { today: todayISO(), upcomingDays: 7 });
+  const { ov, sum } = useMemo(() => {
+    const ov = overview(accounts, transactions, recurrences, { today, upcomingDays: 7 });
     const sum = summarizeItems(itemsForMonth(month, transactions, recurrences));
     return { ov, sum };
-  }, [accounts, transactions, recurrences, month]);
+  }, [accounts, transactions, recurrences, month, today]);
 
-  const { ov, sum } = data;
+  const daysLeft = daysInMonth(month) - dayOf(today);
+  const lastDay = daysInMonth(month);
+  const attention = [...ov.overdue, ...ov.upcoming].slice(0, 8);
   const open = (key: string) => router.push({ pathname: '/lancamento/[key]', params: { key } });
+  const empty = transactions.length === 0 && recurrences.length === 0;
 
   return (
-    <View style={{ flex: 1 }}>
-      <Screen>
-        <T variant="title">Live</T>
-
-        <Card style={{ backgroundColor: c.navy, borderColor: c.navy }}>
-          <T variant="caption" color="#FFFFFFB3">Saldo em contas agora</T>
-          <T variant="title" color={c.onNavy} style={{ fontVariant: ['tabular-nums'] }}>
-            {formatBRL(ov.balance)}
-          </T>
-          <View style={{ height: 1, backgroundColor: '#FFFFFF22' }} />
-          <T variant="caption" color="#FFFFFFB3">Previsto para o fim de {monthLabel(month, false).toLowerCase()}</T>
-          <T variant="amount" color={ov.forecast < 0 ? '#FF9C94' : '#7BE8C6'} style={{ fontVariant: ['tabular-nums'] }}>
-            {formatBRL(ov.forecast)}
-          </T>
-          <T variant="caption" color="#FFFFFFB3">
-            Considera o que ainda falta receber e pagar, inclusive o que está atrasado.
-          </T>
-        </Card>
-
-        <View style={{ flexDirection: 'row', gap: space.md }}>
-          <Card style={{ flex: 1 }}>
-            <T variant="label">A receber</T>
-            <Amount cents={ov.pendingIncome} type="income" />
-          </Card>
-          <Card style={{ flex: 1 }}>
-            <T variant="label">A pagar</T>
-            <Amount cents={ov.pendingExpense} type="expense" />
-          </Card>
+    <Screen>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ gap: 2 }}>
+          <T variant="caption">{greeting(new Date().getHours())}</T>
+          <T variant="title">Live</T>
         </View>
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <IconButton icon={hideValues ? 'eye-off-outline' : 'eye-outline'} label={hideValues ? 'Mostrar valores' : 'Esconder valores'} onPress={toggleHideValues} />
+          <IconButton icon={scheme === 'dark' ? 'weather-night' : 'white-balance-sunny'} label="Aparência" onPress={() => router.push('/aparencia')} />
+        </View>
+      </View>
 
-        {ov.overdue.length > 0 && (
-          <Card style={{ borderColor: c.warning }}>
-            <T variant="heading" color={c.warning}>Atrasados ({ov.overdue.length})</T>
-            <T variant="caption">Toque no círculo para marcar como pago ou recebido.</T>
-            {ov.overdue.slice(0, 8).map((it) => (
-              <ItemRow key={it.key} item={it} showDate onPress={() => open(it.key)} />
-            ))}
-          </Card>
-        )}
+      <View style={{ backgroundColor: c.hero, borderRadius: radius.xl, padding: 22, gap: 14 }}>
+        <T variant="caption" color={c.heroMuted}>Saldo em contas</T>
+        <Amount cents={ov.balance} size="display" color={c.onHero} />
+        <View style={{ height: 1, backgroundColor: c.heroLine }} />
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md }}>
+          <View style={{ gap: 2, flex: 1 }}>
+            <T variant="caption" color={c.heroMuted}>Sobra até {lastDay} de {monthLabel(month, false).toLowerCase()}</T>
+            <Amount cents={ov.forecast} size="amount" color={ov.forecast < 0 ? '#FFB4AD' : c.spark} />
+          </View>
+          <Pill tone="hero" label={daysLeft === 0 ? 'último dia' : daysLeft === 1 ? '1 dia' : `${daysLeft} dias`} />
+        </View>
+      </View>
 
+      <View style={{ flexDirection: 'row', gap: space.md }}>
+        <Card style={{ flex: 1, gap: 6 }}>
+          <T variant="caption">A receber</T>
+          <Amount cents={ov.pendingIncome} type="income" size="heading" />
+        </Card>
+        <Card style={{ flex: 1, gap: 6 }}>
+          <T variant="caption">A pagar</T>
+          <Amount cents={ov.pendingExpense} type="expense" size="heading" />
+        </Card>
+      </View>
+
+      {empty ? (
         <Card>
-          <T variant="heading">Próximos 7 dias</T>
-          {ov.upcoming.length === 0 ? (
-            <T variant="caption">Nada vencendo nos próximos dias.</T>
+          <Empty icon="wallet-plus-outline" title="Comece pelo botão +" text="Cadastre seu salário e suas contas fixas como “Todo mês”: elas aparecem sozinhas em todos os meses." />
+        </Card>
+      ) : (
+        <Card style={{ gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 6 }}>
+            <T variant="heading">Precisa de atenção</T>
+            {ov.overdue.length > 0 ? <Pill label={ov.overdue.length === 1 ? '1 atrasado' : `${ov.overdue.length} atrasados`} /> : null}
+          </View>
+          {attention.length === 0 ? (
+            <T variant="caption">Nada atrasado e nada vencendo nos próximos 7 dias.</T>
           ) : (
-            ov.upcoming.map((it) => <ItemRow key={it.key} item={it} showDate onPress={() => open(it.key)} />)
+            attention.map((it) => <ItemRow key={it.key} item={it} showDate onPress={() => open(it.key)} />)
           )}
+          {ov.overdue.length + ov.upcoming.length > attention.length ? (
+            <T variant="caption" style={{ paddingTop: 6 }}>Veja o restante na aba Extrato.</T>
+          ) : null}
         </Card>
+      )}
 
-        <Card>
-          <T variant="heading">{monthLabel(month)}</T>
-          <Row label="Receitas" cents={sum.income} type="income" hint={`${fmt(sum.incomeReceived)} recebido`} />
-          <Row label="Despesas" cents={sum.expense} type="expense" hint={`${fmt(sum.expensePaid)} pago`} />
-          <View style={{ height: 1, backgroundColor: c.border }} />
-          <Row label="Resultado do mês" cents={Math.abs(sum.result)} type={sum.result >= 0 ? 'income' : 'expense'} />
-        </Card>
-
-        {transactions.length === 0 && recurrences.length === 0 && (
-          <Empty icon="wallet-outline" title="Comece pelo botão +" text="Cadastre seu salário e suas contas fixas como mensais: elas aparecem sozinhas todo mês." />
-        )}
-      </Screen>
-      <Fab onPress={() => router.push('/lancamento/novo')} />
-    </View>
+      <Card>
+        <T variant="heading">{monthLabel(month)}</T>
+        <Row label="Receitas" cents={sum.income} type="income" hint={sum.incomeReceived} hintLabel="recebido" />
+        <Row label="Despesas" cents={sum.expense} type="expense" hint={sum.expensePaid} hintLabel="pago" />
+        <View style={{ height: 1, backgroundColor: c.border }} />
+        <Row label="Resultado do mês" cents={Math.abs(sum.result)} type={sum.result >= 0 ? 'income' : 'expense'} />
+      </Card>
+    </Screen>
   );
 }
 
-const fmt = formatBRL;
-
-function Row({ label, cents, type, hint }: { label: string; cents: number; type: 'income' | 'expense'; hint?: string }) {
+function Row({ label, cents, type, hint, hintLabel }: { label: string; cents: number; type: 'income' | 'expense'; hint?: number; hintLabel?: string }) {
+  const c = useColors();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ flex: 1 }}>
-        <T>{label}</T>
-        {hint ? <T variant="caption">{hint}</T> : null}
+      <View style={{ flex: 1, gap: 2 }}>
+        <T variant="bodyStrong">{label}</T>
+        {hint !== undefined ? (
+          <View style={{ flexDirection: 'row', gap: 4 }}>
+            <Amount cents={hint} size="caption" color={c.muted} />
+            <T variant="caption">{hintLabel}</T>
+          </View>
+        ) : null}
       </View>
       <Amount cents={cents} type={type} />
     </View>
