@@ -4,6 +4,7 @@
  * A camada de banco só aplica o resultado (upsert).
  */
 import { dateForDay, dayOf, monthDiff, monthOf, shiftMonth, type DateISO, type MonthKey } from './dates';
+import { occurrenceId } from './ids';
 import type { Scope } from './recurrence';
 import type { EntryType, ListItem, Recurrence, Transaction } from './types';
 
@@ -120,7 +121,8 @@ export function materialize(ctx: Ctx, rule: Recurrence, month: MonthKey, patch: 
   const now = ctx.now();
   return applyPatch(
     {
-      id: ctx.newId(),
+      // id fixo por (regra, mês): dois aparelhos que pagam a mesma ocorrência geram o mesmo registro
+      id: occurrenceId(rule.id, month),
       createdAt: now,
       updatedAt: now,
       deletedAt: null,

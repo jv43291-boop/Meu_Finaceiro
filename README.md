@@ -43,6 +43,16 @@ npm test
 - Ícone e splash saem de `assets/brand/logo.svg`. Depois de mudar o desenho, rode `npm run icons` para gerar os PNGs.
 - O Expo Go mostra o ícone dele; o ícone e o splash do Live só aparecem num build (`npx eas-cli@latest build -p android --profile preview`).
 
+## Nuvem (Supabase)
+
+Os dados ficam no celular e sincronizam sozinhos com o Supabase: ao abrir o app, alguns segundos depois de cada alteração e a cada 5 minutos. Vence a alteração mais recente de cada registro.
+
+1. No Supabase (projeto `xnsajwmjezhabawctxla`), abra o **SQL Editor** e rode `supabase/migrations/20260925000000_live_sync.sql`. Ele cria `accounts`, `categories`, `recurrences` e `transactions` com RLS por usuário e não mexe na tabela antiga `finance_backups`.
+2. Copie `.env.example` para `.env` e cole a chave **publishable** em `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Nunca use a chave secreta ou service_role no app.
+3. Reinicie o `npx expo start` e entre em **Mais → Conta e sincronização**.
+
+Ao entrar com a mesma conta do app antigo, o Live encontra o backup em `finance_backups` e oferece a importação.
+
 ## Importar do app antigo
 
 Em **Mais → Importar do app antigo**, escolha o JSON do backup (o `payload` da tabela `finance_backups`) ou cole o texto. Lançamentos recorrentes viram regras mensais de verdade.
@@ -50,7 +60,7 @@ Em **Mais → Importar do app antigo**, escolha o JSON do backup (o `payload` da
 ## Roteiro
 
 1. ~~Base local: contas, categorias, lançamentos, recorrência, parcelas, importação~~
-2. Login e sincronização automática com Supabase (tabelas novas + RLS)
+2. ~~Login e sincronização automática com Supabase (tabelas novas + RLS)~~
 3. Cartão de crédito e faturas
 4. Orçamentos, metas e relatórios
 5. Lembretes de vencimento, exportar CSV, biometria

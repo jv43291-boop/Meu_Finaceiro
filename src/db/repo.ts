@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { DEFAULT_ACCOUNT, DEFAULT_CATEGORIES } from '@/domain/defaults';
+import { stableId } from '@/domain/ids';
 import type { Changes } from '@/domain/operations';
 import type { Account, Category, Recurrence, Transaction } from '@/domain/types';
 
@@ -127,17 +128,18 @@ export async function applyChanges(db: SQLiteDatabase, changes: Changes, extra?:
 }
 
 /** Cria conta e categorias padrão no primeiro uso. */
-export async function seedIfEmpty(db: SQLiteDatabase, newId: () => string, now: string) {
+export async function seedIfEmpty(db: SQLiteDatabase, _newId: () => string, now: string) {
   const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM accounts');
   if ((row?.n ?? 0) > 0) return;
   await db.withTransactionAsync(async () => {
     await upsertAccount(db, {
-      id: newId(), name: DEFAULT_ACCOUNT.name, kind: DEFAULT_ACCOUNT.kind, openingBalanceCents: 0,
+      // ids fixos: dois aparelhos criam a MESMA conta e categorias padrão, e o sync junta
+      id: stableId('seed:account:default'), name: DEFAULT_ACCOUNT.name, kind: DEFAULT_ACCOUNT.kind, openingBalanceCents: 0,
       color: DEFAULT_ACCOUNT.color, archived: false, createdAt: now, updatedAt: now, deletedAt: null,
     });
     for (const c of DEFAULT_CATEGORIES) {
       await upsertCategory(db, {
-        id: newId(), name: c.name, type: c.type, icon: c.icon, color: c.color, archived: false,
+        id: stableId(`seed:category:${c.type}:${c.name}`), name: c.name, type: c.type, icon: c.icon, color: c.color, archived: false,
         createdAt: now, updatedAt: now, deletedAt: null,
       });
     }

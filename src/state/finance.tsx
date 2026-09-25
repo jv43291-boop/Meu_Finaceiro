@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import { applyChanges, loadAll, seedIfEmpty, upsertAccount, upsertCategory, type Snapshot } from '@/db/repo';
 import { currentMonthKey, type MonthKey } from '@/domain/dates';
+import { emitLocalChange } from './events';
 import { importLegacy, parseLegacy, type ImportResult } from '@/domain/legacyImport';
 import {
   createEntry, deleteItem, editItem, endRecurrence, togglePaid,
@@ -35,6 +36,8 @@ interface FinanceValue extends Snapshot {
   saveAccount: (a: Account) => Promise<void>;
   saveCategory: (c: Category) => Promise<void>;
   importOldApp: (raw: unknown) => Promise<ImportResult>;
+  /** relê o banco (usado depois de baixar dados da nuvem) */
+  reload: () => Promise<void>;
 }
 
 const FinanceContext = createContext<FinanceValue | null>(null);
@@ -70,6 +73,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       if (!changes.transactions.length && !changes.recurrences.length && !extra?.categories?.length) return;
       await applyChanges(db, changes, extra);
       await reload();
+      emitLocalChange();
     },
     [db, reload],
   );
@@ -96,11 +100,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       saveAccount: async (a) => {
         await upsertAccount(db, a);
         await reload();
+        emitLocalChange();
       },
       saveCategory: async (c) => {
         await upsertCategory(db, c);
         await reload();
+        emitLocalChange();
       },
+      reload,
       importOldApp: async (raw) => {
         const result = importLegacy(ctx, parseLegacy(raw), snap.categories, active[0]?.id ?? null);
         await commit(

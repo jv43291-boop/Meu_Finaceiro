@@ -6,6 +6,7 @@
     "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "@expo/ui": "~57.0.20",
     "@expo/vector-icons": "^15.0.2",
+    "@supabase/supabase-js": "^2.117.2",
     "eslint-config-expo": "~57.0.2",
     "expo": "~57.0.25",
     "expo-constants": "~57.0.19",

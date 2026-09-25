@@ -13,6 +13,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DATABASE_NAME, migrateDbIfNeeded } from '@/db/schema';
+import { CloudProvider } from '@/state/cloud';
 import { FinanceProvider, useFinance } from '@/state/finance';
 import { T } from '@/ui/components';
 import { AppThemeProvider, fonts, useAppTheme } from '@/ui/theme';
@@ -50,6 +51,7 @@ function ThemedApp() {
   return (
     <ThemeProvider value={navTheme}>
       <FinanceProvider>
+        <CloudProvider>
         <Gate>
           <Stack screenOptions={{ headerTintColor: c.text, headerStyle: { backgroundColor: c.background }, headerTitleStyle: { fontFamily: fonts.extrabold, fontSize: 17 }, headerShadowVisible: false, contentStyle: { backgroundColor: c.background } }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -62,8 +64,10 @@ function ThemedApp() {
             <Stack.Screen name="categoria/[id]" options={{ title: 'Categoria', presentation: 'modal' }} />
             <Stack.Screen name="importar" options={{ title: 'Importar do app antigo' }} />
             <Stack.Screen name="aparencia" options={{ title: 'Aparência' }} />
+            <Stack.Screen name="nuvem" options={{ title: 'Conta e sincronização' }} />
           </Stack>
         </Gate>
+        </CloudProvider>
       </FinanceProvider>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
     </ThemeProvider>
