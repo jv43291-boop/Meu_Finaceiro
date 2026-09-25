@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "2.0.0",
   "dependencies": {
+    "@expo-google-fonts/plus-jakarta-sans": "^0.4.2",
     "@expo/ui": "~57.0.20",
     "@expo/vector-icons": "^15.0.2",
     "eslint-config-expo": "~57.0.2",
@@ -14,6 +15,7 @@
     "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-glass-effect": "~57.0.4",
+    "expo-haptics": "~57.0.3",
     "expo-image": "~57.0.5",
     "expo-linking": "~57.0.11",
     "expo-router": "~57.0.23",
@@ -36,6 +38,7 @@
   "devDependencies": {
     "@types/react": "~19.2.2",
     "eslint": "^9.39.5",
+    "sharp": "^0.35.4",
     "typescript": "~6.0.3",
     "vitest": "^5.0.2"
   },
@@ -47,7 +50,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "icons": "node scripts/gerar-icones.mjs"
   },
   "private": true
 }
