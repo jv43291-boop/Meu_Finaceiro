@@ -28,7 +28,7 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Screen>
-        <T variant="title">Meu Financeiro</T>
+        <T variant="title">Live</T>
 
         <Card style={{ backgroundColor: c.navy, borderColor: c.navy }}>
           <T variant="caption" color="#FFFFFFB3">Saldo em contas agora</T>

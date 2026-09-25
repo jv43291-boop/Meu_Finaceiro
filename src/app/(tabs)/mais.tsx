@@ -22,7 +22,7 @@ export default function MoreScreen() {
         <T variant="label">Em breve</T>
         <T variant="caption">Sincronização automática com a nuvem, cartão de crédito, orçamentos, metas e relatórios.</T>
       </Card>
-      <T variant="caption" style={{ textAlign: 'center' }}>Meu Financeiro {Constants.expoConfig?.version ?? ''}</T>
+      <T variant="caption" style={{ textAlign: 'center' }}>Live Finanças {Constants.expoConfig?.version ?? ''}</T>
     </Screen>
   );
 }

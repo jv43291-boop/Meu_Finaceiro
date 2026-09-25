@@ -1,6 +1,6 @@
-# Meu Financeiro 2.0
+# Live Finanças
 
-App de finanças pessoais em Expo (React Native). Reescrita do Meu Financeiro 1.0: o celular é a fonte principal dos dados e a sincronização com o Supabase entra na fase 2.
+App de finanças pessoais em Expo (React Native), sucessor do Meu Financeiro 1.0. Pacote Android `com.victor.live` (instala ao lado do app antigo). Reescrita do zero: o celular é a fonte principal dos dados e a sincronização com o Supabase entra na fase 2.
 
 ## Rodar
 
