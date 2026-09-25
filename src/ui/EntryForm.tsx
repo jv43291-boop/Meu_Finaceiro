@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 
-import { addDays, formatDateBR, parseDateBR, todayISO, type DateISO } from '@/domain/dates';
+import { dueDateOf, invoiceMonthFor } from '@/domain/cards';
+import { addDays, formatDateBR, monthLabel, parseDateBR, shiftMonth, todayISO, type DateISO } from '@/domain/dates';
 import { formatPlain, parseMoney } from '@/domain/money';
 import { validateEntry, type EntryInput, type Repeat } from '@/domain/operations';
 import type { Scope } from '@/domain/recurrence';
 import type { EntryType, ListItem } from '@/domain/types';
 import { useFinance } from '@/state/finance';
-import { Button, Chip, Field, Input, ScopeSheet, Segmented, SwitchRow, T } from './components';
+import { Button, Chip, Field, IconButton, Input, ScopeSheet, Segmented, SwitchRow, T } from './components';
 import { confirmAsk, notify } from './dialogs';
 import { fonts, space, useColors } from './theme';
 
@@ -32,6 +33,9 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
   const [date, setDate] = useState<DateISO>(item?.date ?? defaultDate ?? todayISO());
   const [dateText, setDateText] = useState(formatDateBR(item?.date ?? defaultDate ?? todayISO()));
   const [paid, setPaid] = useState(item?.paid ?? false);
+  const [cardId, setCardId] = useState<string | null>(item?.cardId && !item.invoicePayment ? item.cardId : null);
+  // quantos meses a pessoa empurrou a fatura em relação à calculada pela data
+  const [invoiceShift, setInvoiceShift] = useState(0);
   const [notes, setNotes] = useState(item?.notes ?? '');
   const [repeat, setRepeat] = useState<RepeatKind>('none');
   const [months, setMonths] = useState('');
@@ -41,6 +45,12 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
 
   const categories = f.categories.filter((cat) => cat.type === type && !cat.archived);
   const accounts = f.accounts.filter((a) => !a.archived);
+  const cards = f.cards.filter((k) => !k.archived || k.id === cardId);
+  const card = cardId ? f.cardById.get(cardId) : undefined;
+  const onCard = type === 'expense' && !!card;
+  // fatura: a que já estava gravada (edição) ou a calculada pela data, mais o ajuste manual
+  const baseInvoice = card ? (editing && item?.invoiceMonth && item.cardId === card.id && item.date === date ? item.invoiceMonth : invoiceMonthFor(card, date)) : null;
+  const invoiceMonth = baseInvoice ? shiftMonth(baseInvoice, invoiceShift) : null;
 
   // sugestões a partir de lançamentos anteriores
   const suggestions = useMemo(() => {
@@ -73,7 +83,10 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
     const cents = parseMoney(amount);
     const parsedDate = parseDateBR(dateText, Number(date.slice(0, 4)));
     const input: EntryInput = {
-      type, description, amountCents: cents ?? 0, date: parsedDate ?? '', paid, categoryId, accountId, notes,
+      type, description, amountCents: cents ?? 0, date: parsedDate ?? '', paid: onCard ? false : paid, categoryId,
+      accountId: onCard ? null : accountId, notes,
+      cardId: onCard ? cardId : null,
+      invoiceMonth: onCard ? invoiceMonth : null,
     };
     const err = cents === null ? 'Informe um valor válido, por exemplo 1.621,50.' : !parsedDate ? 'Informe a data no formato dd/mm/aaaa.' : validateEntry(input);
     if (err) {
@@ -181,12 +194,16 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
           </View>
         </Field>
 
-        {accounts.length > 1 && (
-          <Field label="Conta">
+        {(accounts.length > 1 || (type === 'expense' && cards.length > 0)) && (
+          <Field label={type === 'expense' ? 'Pagar com' : 'Conta'}>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
               {accounts.map((a) => (
-                <Chip key={a.id} label={a.name} icon="wallet-outline" color={a.color} selected={accountId === a.id} onPress={() => setAccountId(a.id)} />
+                <Chip key={a.id} label={a.name} icon="wallet-outline" color={a.color} selected={!onCard && accountId === a.id} onPress={() => { setAccountId(a.id); setCardId(null); }} />
               ))}
+              {type === 'expense' &&
+                cards.map((k) => (
+                  <Chip key={k.id} label={k.name} icon="credit-card-outline" color={k.color} selected={cardId === k.id} onPress={() => { setCardId(k.id); setInvoiceShift(0); }} />
+                ))}
             </View>
           </Field>
         )}
@@ -199,12 +216,25 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
           </View>
         </Field>
 
-        <SwitchRow
-          title={type === 'income' ? 'Já recebi' : 'Já paguei'}
-          subtitle={type === 'income' ? 'Soma no saldo da conta.' : 'Desconta do saldo da conta.'}
-          value={paid}
-          onChange={setPaid}
-        />
+        {onCard && invoiceMonth ? (
+          <Field label="Fatura" hint={repeat === 'installments' && !editing ? 'A primeira parcela entra nesta fatura; as outras, nas seguintes.' : 'Calculada pela data e pelo fechamento do cartão. Ajuste se o banco lançou em outra.'}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+              <IconButton icon="chevron-left" label="Fatura anterior" onPress={() => setInvoiceShift((n) => n - 1)} />
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <T variant="bodyStrong">{monthLabel(invoiceMonth)}</T>
+                <T variant="caption">vence {formatDateBR(dueDateOf(card!, invoiceMonth))}</T>
+              </View>
+              <IconButton icon="chevron-right" label="Próxima fatura" onPress={() => setInvoiceShift((n) => n + 1)} />
+            </View>
+          </Field>
+        ) : (
+          <SwitchRow
+            title={type === 'income' ? 'Já recebi' : 'Já paguei'}
+            subtitle={type === 'income' ? 'Soma no saldo da conta.' : 'Desconta do saldo da conta.'}
+            value={paid}
+            onChange={setPaid}
+          />
+        )}
 
         {!editing && (
           <Field label="Repetição">

@@ -1,12 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView } from 'react-native';
 
 import { PALETTE } from '@/domain/defaults';
 import { formatPlain, parseMoney } from '@/domain/money';
 import type { Account } from '@/domain/types';
 import { ctx, useFinance } from '@/state/finance';
-import { Button, Chip, Field, Input, Segmented, SwitchRow } from '@/ui/components';
+import { Button, ColorPicker, Field, Input, Segmented, SwitchRow } from '@/ui/components';
 import { notify } from '@/ui/dialogs';
 import { space } from '@/ui/theme';
 import { goBack } from '@/ui/nav';
@@ -55,9 +55,7 @@ export default function AccountForm() {
         <Input value={opening} onChangeText={setOpening} keyboardType="numbers-and-punctuation" />
       </Field>
       <Field label="Cor">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {PALETTE.map((p) => <Chip key={p} label="  " color={p} icon="circle" selected={color === p} onPress={() => setColor(p)} />)}
-        </View>
+        <ColorPicker colors={PALETTE} value={color} onChange={setColor} />
       </Field>
       {existing && <SwitchRow title="Arquivada" subtitle="Some das escolhas, mas mantém o histórico e o saldo." value={archived} onChange={setArchived} />}
       <Button title="Salvar" icon="check" onPress={save} />

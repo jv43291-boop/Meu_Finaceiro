@@ -5,7 +5,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { CATEGORY_ICONS, PALETTE } from '@/domain/defaults';
 import type { EntryType } from '@/domain/types';
 import { ctx, useFinance } from '@/state/finance';
-import { Button, Chip, Field, Icon, Input, Segmented, SwitchRow } from '@/ui/components';
+import { Button, ColorPicker, Field, Icon, Input, Segmented, SwitchRow } from '@/ui/components';
 import { notify } from '@/ui/dialogs';
 import { radius, space, useColors } from '@/ui/theme';
 import { goBack } from '@/ui/nav';
@@ -57,9 +57,7 @@ export default function CategoryForm() {
         </View>
       </Field>
       <Field label="Cor">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-          {PALETTE.map((p) => <Chip key={p} label="  " color={p} icon="circle" selected={color === p} onPress={() => setColor(p)} />)}
-        </View>
+        <ColorPicker colors={PALETTE} value={color} onChange={setColor} />
       </Field>
       {existing && <SwitchRow title="Arquivada" subtitle="Some das escolhas ao lançar, mas continua no histórico." value={archived} onChange={setArchived} />}
       <Button title="Salvar" icon="check" onPress={save} />

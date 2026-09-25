@@ -65,6 +65,9 @@ function ThemedApp() {
             <Stack.Screen name="importar" options={{ title: 'Importar do app antigo' }} />
             <Stack.Screen name="aparencia" options={{ title: 'Personalizar' }} />
             <Stack.Screen name="nuvem" options={{ title: 'Conta e sincronização' }} />
+            <Stack.Screen name="cartoes" options={{ title: 'Cartões' }} />
+            <Stack.Screen name="cartao/[id]" options={{ title: 'Cartão' }} />
+            <Stack.Screen name="cartao/editar" options={{ title: 'Cartão', presentation: 'modal' }} />
           </Stack>
         </Gate>
         </CloudProvider>

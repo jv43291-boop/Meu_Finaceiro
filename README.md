@@ -48,11 +48,19 @@ npm test
 
 Os dados ficam no celular e sincronizam sozinhos com o Supabase: ao abrir o app, alguns segundos depois de cada alteração e a cada 5 minutos. Vence a alteração mais recente de cada registro.
 
-1. No Supabase (projeto `xnsajwmjezhabawctxla`), abra o **SQL Editor** e rode `supabase/migrations/20260925000000_live_sync.sql`. Ele cria `accounts`, `categories`, `recurrences` e `transactions` com RLS por usuário e não mexe na tabela antiga `finance_backups`.
+1. No Supabase (projeto `xnsajwmjezhabawctxla`), abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations` (`20260925000000_live_sync.sql` e depois `20260926000000_live_cards.sql`). Eles criam `accounts`, `categories`, `credit_cards`, `recurrences` e `transactions` com RLS por usuário e não mexe na tabela antiga `finance_backups`.
 2. Copie `.env.example` para `.env` e cole a chave **publishable** em `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Nunca use a chave secreta ou service_role no app.
 3. Reinicie o `npx expo start` e entre em **Mais → Conta e sincronização**.
 
 Ao entrar com a mesma conta do app antigo, o Live encontra o backup em `finance_backups` e oferece a importação.
+
+## Cartão de crédito
+
+- **Mais → Cartões**: nome, limite, dia de fechamento e de vencimento, conta que paga a fatura.
+- No lançamento, **Pagar com** mostra contas e cartões. No cartão, a compra entra na fatura pela data (compra no dia do fechamento ou depois vai para a próxima); dá para empurrar para outra fatura. Parcelado no cartão espalha as parcelas pelas faturas seguintes; "Todo mês" no cartão vira assinatura.
+- A fatura é identificada pelo mês de vencimento. Compras no cartão não mexem no saldo; o que sai da conta é o pagamento da fatura, que aparece no Extrato e no Início no dia do vencimento.
+- Pagamento parcial ou compra lançada depois de pagar aparece como "restante".
+- Para sincronizar cartões, rode também `supabase/migrations/20260926000000_live_cards.sql`. `node scripts/verificar-supabase.mjs` confere tudo.
 
 ## Importar do app antigo
 
@@ -62,6 +70,6 @@ Em **Mais → Importar do app antigo**, escolha o JSON do backup (o `payload` da
 
 1. ~~Base local: contas, categorias, lançamentos, recorrência, parcelas, importação~~
 2. ~~Login e sincronização automática com Supabase (tabelas novas + RLS)~~
-3. Cartão de crédito e faturas
+3. ~~Cartão de crédito e faturas~~
 4. Orçamentos, metas e relatórios
 5. Lembretes de vencimento, exportar CSV, biometria

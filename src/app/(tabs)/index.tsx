@@ -3,11 +3,12 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import { currentMonthKey, dayOf, daysInMonth, monthLabel, todayISO } from '@/domain/dates';
-import { itemsForMonth } from '@/domain/recurrence';
-import { overview, summarizeItems } from '@/domain/summary';
+import { currentInvoiceMonth, invoiceFor } from '@/domain/cards';
+import { cashItemsForMonth, overview, summarizeItems } from '@/domain/summary';
 import { useFinance } from '@/state/finance';
-import { Amount, Card, Empty, IconButton, Pill, Screen, T } from '@/ui/components';
+import { Amount, Card, Empty, IconButton, ListRow, Pill, Screen, T } from '@/ui/components';
 import { ItemRow } from '@/ui/ItemRow';
+import { openItem } from '@/ui/nav';
 import { radius, space, useAppTheme, useColors } from '@/ui/theme';
 
 function greeting(hour: number) {
@@ -20,20 +21,23 @@ function greeting(hour: number) {
 export default function HomeScreen() {
   const c = useColors();
   const { hideValues, toggleHideValues, scheme } = useAppTheme();
-  const { accounts, transactions, recurrences } = useFinance();
+  const { accounts, transactions, recurrences, cards } = useFinance();
   const month = currentMonthKey();
   const today = todayISO();
 
-  const { ov, sum } = useMemo(() => {
-    const ov = overview(accounts, transactions, recurrences, { today, upcomingDays: 7 });
-    const sum = summarizeItems(itemsForMonth(month, transactions, recurrences));
-    return { ov, sum };
-  }, [accounts, transactions, recurrences, month, today]);
+  const { ov, sum, cardRows } = useMemo(() => {
+    const ov = overview(accounts, transactions, recurrences, { today, upcomingDays: 7, cards });
+    const sum = summarizeItems(cashItemsForMonth(month, transactions, recurrences, cards, today));
+    const state = { cards, transactions, recurrences };
+    const cardRows = cards
+      .filter((k) => !k.archived)
+      .map((k) => ({ card: k, invoice: invoiceFor(k, currentInvoiceMonth(k, today), state, today) }));
+    return { ov, sum, cardRows };
+  }, [accounts, transactions, recurrences, cards, month, today]);
 
   const daysLeft = daysInMonth(month) - dayOf(today);
   const lastDay = daysInMonth(month);
   const attention = [...ov.overdue, ...ov.upcoming].slice(0, 8);
-  const open = (key: string) => router.push({ pathname: '/lancamento/[key]', params: { key } });
   const empty = transactions.length === 0 && recurrences.length === 0;
 
   return (
@@ -86,13 +90,30 @@ export default function HomeScreen() {
           {attention.length === 0 ? (
             <T variant="caption">Nada atrasado e nada vencendo nos próximos 7 dias.</T>
           ) : (
-            attention.map((it) => <ItemRow key={it.key} item={it} showDate onPress={() => open(it.key)} />)
+            attention.map((it) => <ItemRow key={it.key} item={it} showDate onPress={() => openItem(it)} />)
           )}
           {ov.overdue.length + ov.upcoming.length > attention.length ? (
             <T variant="caption" style={{ paddingTop: 6 }}>Veja o restante na aba Extrato.</T>
           ) : null}
         </Card>
       )}
+
+      {cardRows.length > 0 ? (
+        <Card style={{ gap: 4 }}>
+          <T variant="heading" style={{ paddingBottom: 6 }}>Cartões</T>
+          {cardRows.map(({ card, invoice }) => (
+            <ListRow
+              key={card.id}
+              icon="credit-card-outline"
+              iconColor={card.color}
+              title={card.name}
+              subtitle={`Fatura atual · vence ${invoice.dueDate.slice(8, 10)}/${invoice.dueDate.slice(5, 7)}`}
+              right={<Amount cents={invoice.totalCents} type="expense" />}
+              onPress={() => router.push({ pathname: '/cartao/[id]', params: { id: card.id, mes: invoice.month } })}
+            />
+          ))}
+        </Card>
+      ) : null}
 
       <Card>
         <T variant="heading">{monthLabel(month)}</T>

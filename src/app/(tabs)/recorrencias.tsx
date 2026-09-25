@@ -11,7 +11,7 @@ import { useColors } from '@/ui/theme';
 
 export default function RecurrencesScreen() {
   const c = useColors();
-  const { recurrences, categoryById } = useFinance();
+  const { recurrences, categoryById, cardById } = useFinance();
   const month = currentMonthKey();
 
   const groups = useMemo(() => {
@@ -36,7 +36,7 @@ export default function RecurrencesScreen() {
         icon={cat?.icon ?? 'calendar-sync-outline'}
         iconColor={cat?.color}
         title={r.description}
-        subtitle={`Todo dia ${r.day} · ${period}`}
+        subtitle={`Todo dia ${r.day} · ${period}${r.cardId && cardById.get(r.cardId) ? ` · ${cardById.get(r.cardId)!.name}` : ''}`}
         right={<Amount cents={r.amountCents} type={r.type} />}
         onPress={() => router.push({ pathname: '/recorrencia/[id]', params: { id: r.id } })}
       />

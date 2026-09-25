@@ -11,7 +11,7 @@ import { useAppTheme } from '@/ui/theme';
 const THEME_LABEL = { system: 'Automático (segue o celular)', light: 'Claro', dark: 'Escuro' } as const;
 
 export default function MoreScreen() {
-  const { accounts, categories, transactions } = useFinance();
+  const { accounts, categories, transactions, cards } = useFinance();
   const { preference } = useAppTheme();
   const cloud = useCloud();
   const cloudSubtitle = !cloud.configured
@@ -29,6 +29,7 @@ export default function MoreScreen() {
       </Card>
       <Card>
         <ListRow icon="wallet-outline" title="Contas" subtitle={`${accounts.length} conta(s) · ${formatBRL(totalBalance(accounts, transactions))}`} onPress={() => router.push('/contas')} />
+        <ListRow icon="credit-card-outline" title="Cartões" subtitle={cards.length ? `${cards.filter((k) => !k.archived).length} cartão(ões)` : 'Cadastre para controlar faturas'} onPress={() => router.push('/cartoes')} />
         <ListRow icon="shape-outline" title="Categorias" subtitle={`${categories.length} categorias`} onPress={() => router.push('/categorias')} />
       </Card>
       <Card>
@@ -39,7 +40,7 @@ export default function MoreScreen() {
       </Card>
       <Card>
         <T variant="label">Em breve</T>
-        <T variant="caption">Cartão de crédito, orçamentos, metas e relatórios.</T>
+        <T variant="caption">Orçamentos, metas e relatórios.</T>
       </Card>
       <T variant="caption" style={{ textAlign: 'center' }}>Live Finanças {Constants.expoConfig?.version ?? ''}</T>
     </Screen>

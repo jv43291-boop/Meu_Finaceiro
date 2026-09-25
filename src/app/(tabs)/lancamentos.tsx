@@ -1,28 +1,27 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, SectionList, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatDateLong } from '@/domain/dates';
-import { itemsForMonth } from '@/domain/recurrence';
-import { summarizeItems } from '@/domain/summary';
+import { cashItemsForMonth, summarizeItems } from '@/domain/summary';
 import type { ListItem } from '@/domain/types';
 import { useFinance } from '@/state/finance';
 import { Amount, Chip, Empty, Input, MonthSwitcher, T, cardShadow } from '@/ui/components';
 import { AppBackground } from '@/ui/AppBackground';
 import { ItemRow } from '@/ui/ItemRow';
+import { openItem } from '@/ui/nav';
 import { radius, space, useColors } from '@/ui/theme';
 
 type Filter = 'all' | 'income' | 'expense' | 'pending';
 
 export default function EntriesScreen() {
   const c = useColors();
-  const { transactions, recurrences, selectedMonth, setSelectedMonth, categoryById } = useFinance();
+  const { transactions, recurrences, cards, selectedMonth, setSelectedMonth, categoryById } = useFinance();
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
 
   const { sections, summary, total } = useMemo(() => {
-    const all = itemsForMonth(selectedMonth, transactions, recurrences);
+    const all = cashItemsForMonth(selectedMonth, transactions, recurrences, cards);
     const q = query.trim().toLowerCase();
     const filtered = all.filter((it) => {
       if (filter === 'income' && it.type !== 'income') return false;
@@ -41,7 +40,7 @@ export default function EntriesScreen() {
       summary: summarizeItems(all),
       total: all.length,
     };
-  }, [transactions, recurrences, selectedMonth, filter, query, categoryById]);
+  }, [transactions, recurrences, cards, selectedMonth, filter, query, categoryById]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={['top', 'left', 'right']}>
@@ -71,7 +70,7 @@ export default function EntriesScreen() {
           <T variant="label" style={{ marginTop: space.lg, marginBottom: space.xs }}>{formatDateLong(section.title)}</T>
         )}
         renderItem={({ item }) => (
-          <ItemRow item={item} framed={c.hasBackground} onPress={() => router.push({ pathname: '/lancamento/[key]', params: { key: item.key } })} />
+          <ItemRow item={item} framed={c.hasBackground} onPress={() => openItem(item)} />
         )}
         ListEmptyComponent={
           <Empty

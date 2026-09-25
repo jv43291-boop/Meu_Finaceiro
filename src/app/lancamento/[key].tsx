@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams } from 'expo-router';
 import { useMemo } from 'react';
 
 import { transactionToItem, virtualItem } from '@/domain/recurrence';
@@ -20,6 +20,7 @@ export default function EditEntryScreen() {
       const t = transactions.find((x) => x.id === parsed.id && !x.deletedAt);
       return t ? transactionToItem(t) : null;
     }
+    if (parsed.kind === 'invoice') return null;
     const existing = transactions.find((x) => x.recurrenceId === parsed.recurrenceId && x.occurrenceMonth === parsed.month && !x.deletedAt);
     if (existing) return transactionToItem(existing);
     const rule = recurrences.find((r) => r.id === parsed.recurrenceId);
@@ -27,6 +28,10 @@ export default function EditEntryScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
+  const parsedKey = key ? parseItemKey(key) : null;
+  if (parsedKey?.kind === 'invoice') {
+    return <Redirect href={{ pathname: '/cartao/[id]', params: { id: parsedKey.cardId, mes: parsedKey.month } }} />;
+  }
   if (!item) {
     return (
       <Screen>

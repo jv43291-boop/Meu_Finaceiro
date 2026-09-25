@@ -301,3 +301,26 @@ export function ScopeSheet({ visible, title, onPick, onClose, kind }: {
 }
 
 export const hairline = StyleSheet.hairlineWidth;
+
+/** Seletor de cor: bolinhas na própria cor, com marca na escolhida. */
+export function ColorPicker({ colors, value, onChange }: { colors: readonly string[]; value: string; onChange: (c: string) => void }) {
+  const c = useColors();
+  return (
+    <View accessibilityRole="radiogroup" style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
+      {colors.map((color) => {
+        const sel = color.toLowerCase() === value.toLowerCase();
+        return (
+          <Pressable
+            key={color}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: sel }}
+            accessibilityLabel={`Cor ${color}`}
+            onPress={() => onChange(color)}
+            style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: color, alignItems: 'center', justifyContent: 'center', borderWidth: sel ? 3 : 0, borderColor: c.text }}>
+            {sel ? <Icon name="check" size={20} color="#FFFFFF" /> : null}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
