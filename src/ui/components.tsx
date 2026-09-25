@@ -1,11 +1,11 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
-import { useState, type ComponentProps, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View,
   type StyleProp, type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { monthLabel, shiftMonth, type MonthKey } from '@/domain/dates';
 import { formatBRL } from '@/domain/money';
@@ -33,9 +33,28 @@ export function Icon({ name, size = 22, color }: { name: string; size?: number; 
   return <MaterialCommunityIcons name={name as IconName} size={size} color={color ?? c.text} />;
 }
 
+/** true dentro das abas: lá a barra de abas já fica acima dos botões do Android */
+export const InTabsContext = createContext(false);
+
+/** Espaço dos botões/gestos do Android fora das abas (dentro delas a barra de abas já cuida). */
+export function useBottomInset(): number {
+  const inTabs = useContext(InTabsContext);
+  const bottom = useSafeAreaInsets().bottom;
+  return inTabs ? 0 : bottom;
+}
+
+/** ScrollView de formulário: o último botão nunca fica atrás dos botões do celular. */
+export function FormScroll({ contentContainerStyle, ...rest }: ComponentProps<typeof ScrollView>) {
+  const bottom = useBottomInset();
+  const flat = StyleSheet.flatten(contentContainerStyle) ?? {};
+  const base = typeof flat.paddingBottom === 'number' ? flat.paddingBottom : typeof flat.padding === 'number' ? flat.padding : 0;
+  return <ScrollView {...rest} contentContainerStyle={[contentContainerStyle, { paddingBottom: Math.max(base, 24) + bottom }]} />;
+}
+
 export function Screen({ children, scroll = true, padded = true }: { children: ReactNode; scroll?: boolean; padded?: boolean }) {
   const c = useColors();
-  const inner = padded ? { padding: space.xl, gap: space.lg, paddingBottom: 48 } : undefined;
+  const extra = useBottomInset();
+  const inner = padded ? { padding: space.xl, gap: space.lg, paddingBottom: 48 + extra } : { paddingBottom: extra };
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: c.canvas }} edges={['top', 'left', 'right']}>
       {/* cada tela desenha a própria foto: telas de abas ficam montadas por baixo e não podem ser transparentes */}
@@ -270,6 +289,7 @@ export function ScopeSheet({ visible, title, onPick, onClose, kind }: {
   visible: boolean; title: string; kind: 'recurrence' | 'installments'; onPick: (s: Scope) => void; onClose: () => void;
 }) {
   const c = useColors();
+  const sheetBottom = useSafeAreaInsets().bottom;
   const opts: { scope: Scope; label: string; hint: string }[] = kind === 'recurrence'
     ? [
         { scope: 'this', label: 'Só este mês', hint: 'Os outros meses continuam iguais.' },
@@ -284,7 +304,7 @@ export function ScopeSheet({ visible, title, onPick, onClose, kind }: {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }} onPress={onClose}>
-        <Pressable style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: space.xl, gap: space.sm, paddingBottom: space.xxl }}>
+        <Pressable style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: space.xl, gap: space.sm, paddingBottom: space.xxl + sheetBottom }}>
           <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: c.border, marginBottom: space.sm }} />
           <T variant="heading">{title}</T>
           {opts.map((o) => (

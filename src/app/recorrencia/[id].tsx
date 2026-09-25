@@ -1,12 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, View } from 'react-native';
 
 import { currentMonthKey, monthDiff, monthLabel, shiftMonth, type MonthKey } from '@/domain/dates';
 import { formatPlain, parseMoney } from '@/domain/money';
 import type { Recurrence } from '@/domain/types';
 import { useFinance } from '@/state/finance';
-import { Button, Chip, Empty, Field, Input, Screen, T } from '@/ui/components';
+import { FormScroll, Button, Chip, Empty, Field, Input, Screen, T } from '@/ui/components';
 import { confirmAsk, notify } from '@/ui/dialogs';
 import { space } from '@/ui/theme';
 import { goBack } from '@/ui/nav';
@@ -94,7 +94,7 @@ function RuleForm({ rule }: { rule: Recurrence }) {
   const accounts = f.accounts.filter((a) => !a.archived);
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+    <FormScroll contentContainerStyle={{ padding: space.lg, gap: space.lg, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
       <T variant="caption">
         Mudanças aqui valem para todos os meses. Lançamentos já gravados (pagos ou editados individualmente) não mudam.
       </T>
@@ -126,6 +126,6 @@ function RuleForm({ rule }: { rule: Recurrence }) {
       <Button title="Salvar" icon="check" onPress={save} />
       <Button title="Encerrar" variant="secondary" icon="calendar-end" onPress={endNow} />
       <Button title="Excluir" variant="danger" icon="trash-can-outline" onPress={remove} />
-    </ScrollView>
+    </FormScroll>
   );
 }

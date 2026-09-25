@@ -1,12 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 
 import { closingDateOf, dueDateOf, invoiceMonthFor } from '@/domain/cards';
 import { formatDateBR, shortMonthLabel, todayISO } from '@/domain/dates';
 import { formatPlain, parseMoney } from '@/domain/money';
 import { ctx, useFinance } from '@/state/finance';
-import { Button, Chip, ColorPicker, Field, Input, SwitchRow, T } from '@/ui/components';
+import { FormScroll, Button, Chip, ColorPicker, Field, Input, SwitchRow, T } from '@/ui/components';
 import { confirmAsk, notify } from '@/ui/dialogs';
 import { goBack } from '@/ui/nav';
 import { space } from '@/ui/theme';
@@ -62,7 +62,7 @@ export default function CardForm() {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.xl, gap: space.xl }} keyboardShouldPersistTaps="handled">
+    <FormScroll contentContainerStyle={{ padding: space.xl, gap: space.xl }} keyboardShouldPersistTaps="handled">
       <Field label="Nome"><Input value={name} onChangeText={setName} placeholder="Ex.: Nubank" autoFocus={!existing} /></Field>
       <Field label="Limite (R$)" hint="Opcional. Serve para mostrar quanto ainda está disponível.">
         <Input value={limit} onChangeText={setLimit} placeholder="0,00" keyboardType="decimal-pad" />
@@ -85,6 +85,6 @@ export default function CardForm() {
       {existing && <SwitchRow title="Arquivado" subtitle="Some das escolhas, mas mantém o histórico." value={archived} onChange={setArchived} />}
       <Button title="Salvar" icon="check" onPress={save} />
       {existing && <Button title="Excluir" variant="danger" icon="trash-can-outline" onPress={remove} />}
-    </ScrollView>
+    </FormScroll>
   );
 }

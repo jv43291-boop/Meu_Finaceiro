@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatPlain, parseMoney } from '@/domain/money';
 import { Button, Field, Input, T } from './components';
@@ -20,6 +21,7 @@ export function MoneySheet({ visible, title, hint, initialCents, confirmLabel, a
   onClose: () => void;
 }) {
   const c = useColors();
+  const sheetBottom = useSafeAreaInsets().bottom;
   const [text, setText] = useState('');
   async function confirm() {
     if (!text.trim() && allowEmpty) return onConfirm(null);
@@ -30,7 +32,7 @@ export function MoneySheet({ visible, title, hint, initialCents, confirmLabel, a
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} onShow={() => setText(initialCents ? formatPlain(initialCents) : '')}>
       <Pressable style={{ flex: 1, backgroundColor: c.overlay, justifyContent: 'flex-end' }} onPress={onClose}>
-        <Pressable style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: space.xl, gap: space.lg, paddingBottom: space.xxl }}>
+        <Pressable style={{ backgroundColor: c.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: space.xl, gap: space.lg, paddingBottom: space.xxl + sheetBottom }}>
           <T variant="heading">{title}</T>
           <Field label="Valor (R$)" hint={hint}>
             <Input large value={text} onChangeText={setText} placeholder="0,00" keyboardType="decimal-pad" autoFocus />

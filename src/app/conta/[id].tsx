@@ -1,12 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView } from 'react-native';
+
 
 import { PALETTE } from '@/domain/defaults';
 import { formatPlain, parseMoney } from '@/domain/money';
 import type { Account } from '@/domain/types';
 import { ctx, useFinance } from '@/state/finance';
-import { Button, ColorPicker, Field, Input, Segmented, SwitchRow } from '@/ui/components';
+import { FormScroll, Button, ColorPicker, Field, Input, Segmented, SwitchRow } from '@/ui/components';
 import { notify } from '@/ui/dialogs';
 import { space } from '@/ui/theme';
 import { goBack } from '@/ui/nav';
@@ -44,7 +44,7 @@ export default function AccountForm() {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg }} keyboardShouldPersistTaps="handled">
+    <FormScroll contentContainerStyle={{ padding: space.lg, gap: space.lg }} keyboardShouldPersistTaps="handled">
       <Field label="Nome"><Input value={name} onChangeText={setName} placeholder="Ex.: Nubank" autoFocus={!existing} /></Field>
       <Field label="Tipo">
         <Segmented value={kind} onChange={setKind} options={[
@@ -60,6 +60,6 @@ export default function AccountForm() {
       {existing && <SwitchRow title="Arquivada" subtitle="Some das escolhas, mas mantém o histórico e o saldo." value={archived} onChange={setArchived} />}
       <Button title="Salvar" icon="check" onPress={save} />
       {existing && <Button title="Excluir" variant="danger" icon="trash-can-outline" onPress={remove} />}
-    </ScrollView>
+    </FormScroll>
   );
 }

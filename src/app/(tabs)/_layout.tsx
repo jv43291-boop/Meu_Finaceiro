@@ -1,23 +1,27 @@
 import { router, Tabs } from 'expo-router';
 import { Pressable, View, type ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Icon, cardShadow } from '@/ui/components';
+import { Icon, InTabsContext, cardShadow } from '@/ui/components';
 import { fonts, useColors } from '@/ui/theme';
 
 export default function TabsLayout() {
   const c = useColors();
+  // Android de borda a borda: a barra de abas cresce para ficar acima dos botões do sistema
+  const bottom = useSafeAreaInsets().bottom;
   const icon = (name: string, active: string) =>
     function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
       return <Icon name={focused ? active : name} size={24} color={color as string} />;
     };
   return (
+    <InTabsContext.Provider value>
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: c.primaryText,
         tabBarInactiveTintColor: c.muted,
         tabBarLabelStyle: { fontFamily: fonts.bold, fontSize: 11 },
-        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, height: 68, paddingTop: 6 },
+        tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, height: 68 + bottom, paddingTop: 6, paddingBottom: Math.max(bottom, 8) },
       }}>
       <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: icon('home-outline', 'home') }} />
       <Tabs.Screen name="lancamentos" options={{ title: 'Extrato', tabBarIcon: icon('format-list-bulleted', 'format-list-bulleted') }} />
@@ -46,5 +50,6 @@ export default function TabsLayout() {
       <Tabs.Screen name="recorrencias" options={{ title: 'Fixos', tabBarIcon: icon('calendar-sync-outline', 'calendar-sync') }} />
       <Tabs.Screen name="mais" options={{ title: 'Mais', tabBarIcon: icon('dots-horizontal-circle-outline', 'dots-horizontal-circle') }} />
     </Tabs>
+    </InTabsContext.Provider>
   );
 }

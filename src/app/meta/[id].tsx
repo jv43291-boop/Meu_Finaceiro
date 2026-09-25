@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { formatDateBR, parseDateBR, todayISO } from '@/domain/dates';
 import { PALETTE } from '@/domain/defaults';
@@ -9,7 +9,7 @@ import { goalPlan } from '@/domain/planning';
 import type { Goal } from '@/domain/types';
 import { ctx, useFinance } from '@/state/finance';
 import { BudgetBar } from '@/ui/Charts';
-import { Amount, Button, Card, ColorPicker, Field, Icon, Input, T, tapFeedback } from '@/ui/components';
+import { FormScroll, Amount, Button, Card, ColorPicker, Field, Icon, Input, T, tapFeedback } from '@/ui/components';
 import { confirmAsk, notify } from '@/ui/dialogs';
 import { MoneySheet } from '@/ui/MoneySheet';
 import { goBack } from '@/ui/nav';
@@ -36,7 +36,7 @@ function GoalDetail({ goal }: { goal: Goal }) {
   if (editing) return <GoalForm goal={goal} onDone={() => setEditing(false)} />;
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.xl, gap: space.lg }}>
+    <FormScroll contentContainerStyle={{ padding: space.xl, gap: space.lg }}>
       <Stack.Screen options={{ title: goal.name }} />
       <View style={{ backgroundColor: goal.color, borderRadius: radius.xl, padding: 20, gap: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -73,7 +73,7 @@ function GoalDetail({ goal }: { goal: Goal }) {
           setSheet(null);
         }}
       />
-    </ScrollView>
+    </FormScroll>
   );
 }
 
@@ -113,7 +113,7 @@ function GoalForm({ goal, onDone }: { goal?: Goal; onDone?: () => void }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.xl, gap: space.xl }} keyboardShouldPersistTaps="handled">
+    <FormScroll contentContainerStyle={{ padding: space.xl, gap: space.xl }} keyboardShouldPersistTaps="handled">
       <Stack.Screen options={{ title: goal ? 'Editar meta' : 'Nova meta' }} />
       <Field label="Nome"><Input value={name} onChangeText={setName} placeholder="Ex.: Reserva de emergência" autoFocus={!goal} /></Field>
       <Field label="Quanto quer juntar (R$)"><Input value={target} onChangeText={setTarget} placeholder="0,00" keyboardType="decimal-pad" /></Field>
@@ -134,6 +134,6 @@ function GoalForm({ goal, onDone }: { goal?: Goal; onDone?: () => void }) {
       <Field label="Cor"><ColorPicker colors={GOAL_COLORS} value={color} onChange={setColor} /></Field>
       <Button title="Salvar meta" icon="check" onPress={save} />
       {goal ? <Button title="Excluir" variant="danger" icon="trash-can-outline" onPress={remove} /> : null}
-    </ScrollView>
+    </FormScroll>
   );
 }

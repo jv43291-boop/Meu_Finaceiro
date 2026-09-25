@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 
 import { dueDateOf, invoiceMonthFor } from '@/domain/cards';
 import { addDays, formatDateBR, monthLabel, parseDateBR, shiftMonth, todayISO, type DateISO } from '@/domain/dates';
@@ -8,7 +8,7 @@ import { validateEntry, type EntryInput, type Repeat } from '@/domain/operations
 import type { Scope } from '@/domain/recurrence';
 import type { EntryType, ListItem } from '@/domain/types';
 import { useFinance } from '@/state/finance';
-import { Button, Chip, Field, IconButton, Input, ScopeSheet, Segmented, SwitchRow, T } from './components';
+import { FormScroll, Button, Chip, Field, IconButton, Input, ScopeSheet, Segmented, SwitchRow, T } from './components';
 import { confirmAsk, notify } from './dialogs';
 import { fonts, space, useColors } from './theme';
 
@@ -149,7 +149,7 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={{ padding: space.xl, gap: space.xl, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+      <FormScroll contentContainerStyle={{ padding: space.xl, gap: space.xl, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         <Segmented
           value={type}
           onChange={(t) => { setType(t); setCategoryId(null); }}
@@ -266,7 +266,7 @@ export function EntryForm({ item, defaultDate, onDone }: EntryFormProps) {
 
         <Button title={editing ? 'Salvar alterações' : 'Salvar lançamento'} onPress={onSave} disabled={busy} icon="check" />
         {editing && <Button title="Excluir" variant="danger" onPress={onDelete} disabled={busy} icon="trash-can-outline" />}
-      </ScrollView>
+      </FormScroll>
 
       <ScopeSheet
         visible={sheet !== null}

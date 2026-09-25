@@ -1,11 +1,11 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { CATEGORY_ICONS, PALETTE } from '@/domain/defaults';
 import type { EntryType } from '@/domain/types';
 import { ctx, useFinance } from '@/state/finance';
-import { Button, ColorPicker, Field, Icon, Input, Segmented, SwitchRow } from '@/ui/components';
+import { FormScroll, Button, ColorPicker, Field, Icon, Input, Segmented, SwitchRow } from '@/ui/components';
 import { notify } from '@/ui/dialogs';
 import { radius, space, useColors } from '@/ui/theme';
 import { goBack } from '@/ui/nav';
@@ -41,7 +41,7 @@ export default function CategoryForm() {
   }
 
   return (
-    <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.lg }} keyboardShouldPersistTaps="handled">
+    <FormScroll contentContainerStyle={{ padding: space.lg, gap: space.lg }} keyboardShouldPersistTaps="handled">
       <Field label="Nome"><Input value={name} onChangeText={setName} autoFocus={!existing} /></Field>
       {!existing && (
         <Segmented value={type} onChange={setType} options={[{ value: 'expense', label: 'Despesa', color: c.expense }, { value: 'income', label: 'Receita', color: c.income }]} />
@@ -62,6 +62,6 @@ export default function CategoryForm() {
       {existing && <SwitchRow title="Arquivada" subtitle="Some das escolhas ao lançar, mas continua no histórico." value={archived} onChange={setArchived} />}
       <Button title="Salvar" icon="check" onPress={save} />
       {existing && <Button title="Excluir" variant="danger" icon="trash-can-outline" onPress={remove} />}
-    </ScrollView>
+    </FormScroll>
   );
 }
