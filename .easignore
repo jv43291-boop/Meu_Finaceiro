@@ -1,0 +1,61 @@
+# O EAS usa este arquivo NO LUGAR do .gitignore ao enviar o projeto para o build.
+# Igual ao .gitignore, mas SEM ignorar o .env: o build precisa da URL e da chave
+# publishable do Supabase (a mesma que já vai dentro do app). Nunca coloque
+# a chave secret/service_role no .env.
+
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+example
+
+# generated native folders
+/ios
+/android
+
+# Meu Financeiro: nunca versionar APK, backups ou dumps com dados pessoais
+*.apk
+*.aab
+*.backup
+*.backup.gz
+*.sql
+!supabase/migrations/*.sql
+*.dump
+backup*.json
+scripts/
+supabase/
+src/**/__tests__/
