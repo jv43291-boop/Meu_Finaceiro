@@ -126,6 +126,24 @@ const MIGRATIONS: string[] = [
     dirty INTEGER NOT NULL DEFAULT 1
   );
   `,
+  // 4: comprovante de Pix — ID do Pix no lançamento e regras por recebedor
+  `
+  ALTER TABLE transactions ADD COLUMN external_id TEXT;
+  CREATE INDEX idx_transactions_external ON transactions (external_id);
+  CREATE TABLE payee_rules (
+    id TEXT PRIMARY KEY NOT NULL,
+    match_name TEXT NOT NULL,
+    match_doc TEXT,
+    description TEXT NOT NULL,
+    category_id TEXT,
+    account_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT,
+    dirty INTEGER NOT NULL DEFAULT 1
+  );
+  CREATE INDEX idx_payee_rules_name ON payee_rules (match_name);
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {

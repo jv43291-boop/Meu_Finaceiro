@@ -19,8 +19,9 @@ export const COLUMNS: Record<SyncTable, string[]> = {
   transactions: [
     'id', 'type', 'description', 'amount_cents', 'date', 'paid', 'category_id', 'account_id', 'notes',
     'recurrence_id', 'occurrence_month', 'group_id', 'installment_number', 'installment_total',
-    'card_id', 'invoice_month', 'invoice_payment', 'created_at', 'updated_at', 'deleted_at',
+    'card_id', 'invoice_month', 'invoice_payment', 'external_id', 'created_at', 'updated_at', 'deleted_at',
   ],
+  payee_rules: ['id', 'match_name', 'match_doc', 'description', 'category_id', 'account_id', 'created_at', 'updated_at', 'deleted_at'],
 };
 
 const BOOLEAN_COLUMNS = new Set(['archived', 'paid', 'invoice_payment']);

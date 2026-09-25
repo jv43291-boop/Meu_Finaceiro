@@ -3,7 +3,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { DEFAULT_ACCOUNT, DEFAULT_CATEGORIES } from '@/domain/defaults';
 import { stableId } from '@/domain/ids';
 import type { Changes } from '@/domain/operations';
-import type { Account, Category, CreditCard, Goal, Recurrence, Transaction } from '@/domain/types';
+import type { Account, Category, CreditCard, Goal, PayeeRule, Recurrence, Transaction } from '@/domain/types';
 
 type Row = Record<string, any>;
 
@@ -44,6 +44,13 @@ const toTransaction = (r: Row): Transaction => ({
   recurrenceId: r.recurrence_id, occurrenceMonth: r.occurrence_month, groupId: r.group_id,
   installmentNumber: r.installment_number, installmentTotal: r.installment_total,
   cardId: r.card_id ?? null, invoiceMonth: r.invoice_month ?? null, invoicePayment: bool(r.invoice_payment),
+  externalId: r.external_id ?? null,
+  createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
+});
+
+const toPayeeRule = (r: Row): PayeeRule => ({
+  id: r.id, matchName: r.match_name, matchDoc: r.match_doc ?? null, description: r.description,
+  categoryId: r.category_id ?? null, accountId: r.account_id ?? null,
   createdAt: r.created_at, updatedAt: r.updated_at, deletedAt: r.deleted_at,
 });
 
@@ -55,16 +62,18 @@ export interface Snapshot {
   transactions: Transaction[];
   cards: CreditCard[];
   goals: Goal[];
+  payeeRules: PayeeRule[];
 }
 
 export async function loadAll(db: SQLiteDatabase): Promise<Snapshot> {
-  const [a, c, r, t, k, g] = await Promise.all([
+  const [a, c, r, t, k, g, pr] = await Promise.all([
     db.getAllAsync<Row>('SELECT * FROM accounts WHERE deleted_at IS NULL ORDER BY created_at'),
     db.getAllAsync<Row>('SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY type DESC, name'),
     db.getAllAsync<Row>('SELECT * FROM recurrences WHERE deleted_at IS NULL ORDER BY day, description'),
     db.getAllAsync<Row>('SELECT * FROM transactions ORDER BY date'),
     db.getAllAsync<Row>('SELECT * FROM credit_cards WHERE deleted_at IS NULL ORDER BY created_at'),
     db.getAllAsync<Row>('SELECT * FROM goals WHERE deleted_at IS NULL ORDER BY created_at'),
+    db.getAllAsync<Row>('SELECT * FROM payee_rules WHERE deleted_at IS NULL ORDER BY match_name'),
   ]);
   return {
     accounts: a.map(toAccount),
@@ -73,6 +82,7 @@ export async function loadAll(db: SQLiteDatabase): Promise<Snapshot> {
     transactions: t.map(toTransaction),
     cards: k.map(toCard),
     goals: g.map(toGoal),
+    payeeRules: pr.map(toPayeeRule),
   };
 }
 
@@ -128,6 +138,19 @@ export async function upsertGoal(db: SQLiteDatabase, g: Goal) {
   );
 }
 
+export async function upsertPayeeRule(db: SQLiteDatabase, p: PayeeRule) {
+  await db.runAsync(
+    `INSERT INTO payee_rules (id, match_name, match_doc, description, category_id, account_id, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $name, $doc, $desc, $cat, $acc, $ca, $ua, $da, 1)
+     ON CONFLICT(id) DO UPDATE SET match_name=$name, match_doc=$doc, description=$desc, category_id=$cat,
+       account_id=$acc, updated_at=$ua, deleted_at=$da, dirty=1`,
+    {
+      $id: p.id, $name: p.matchName, $doc: p.matchDoc, $desc: p.description, $cat: p.categoryId, $acc: p.accountId,
+      $ca: p.createdAt, $ua: p.updatedAt, $da: p.deletedAt,
+    },
+  );
+}
+
 async function upsertRecurrence(db: SQLiteDatabase, r: Recurrence) {
   await db.runAsync(
     `INSERT INTO recurrences (id, type, description, amount_cents, category_id, account_id, day, start_month,
@@ -148,17 +171,17 @@ async function upsertTransaction(db: SQLiteDatabase, t: Transaction) {
   await db.runAsync(
     `INSERT INTO transactions (id, type, description, amount_cents, date, paid, category_id, account_id, notes,
        recurrence_id, occurrence_month, group_id, installment_number, installment_total,
-       card_id, invoice_month, invoice_payment, created_at, updated_at, deleted_at, dirty)
-     VALUES ($id, $type, $desc, $amt, $date, $paid, $cat, $acc, $notes, $rec, $occ, $grp, $in, $it, $card, $inv, $invp, $ca, $ua, $da, 1)
+       card_id, invoice_month, invoice_payment, external_id, created_at, updated_at, deleted_at, dirty)
+     VALUES ($id, $type, $desc, $amt, $date, $paid, $cat, $acc, $notes, $rec, $occ, $grp, $in, $it, $card, $inv, $invp, $ext, $ca, $ua, $da, 1)
      ON CONFLICT(id) DO UPDATE SET type=$type, description=$desc, amount_cents=$amt, date=$date, paid=$paid,
        category_id=$cat, account_id=$acc, notes=$notes, recurrence_id=$rec, occurrence_month=$occ,
        group_id=$grp, installment_number=$in, installment_total=$it, card_id=$card, invoice_month=$inv,
-       invoice_payment=$invp, updated_at=$ua, deleted_at=$da, dirty=1`,
+       invoice_payment=$invp, external_id=$ext, updated_at=$ua, deleted_at=$da, dirty=1`,
     {
       $id: t.id, $type: t.type, $desc: t.description, $amt: t.amountCents, $date: t.date,
       $paid: t.paid ? 1 : 0, $cat: t.categoryId, $acc: t.accountId, $notes: t.notes,
       $rec: t.recurrenceId, $occ: t.occurrenceMonth, $grp: t.groupId, $in: t.installmentNumber,
-      $it: t.installmentTotal, $card: t.cardId, $inv: t.invoiceMonth, $invp: t.invoicePayment ? 1 : 0, $ca: t.createdAt, $ua: t.updatedAt, $da: t.deletedAt,
+      $it: t.installmentTotal, $card: t.cardId, $inv: t.invoiceMonth, $invp: t.invoicePayment ? 1 : 0, $ext: t.externalId ?? null, $ca: t.createdAt, $ua: t.updatedAt, $da: t.deletedAt,
     },
   );
 }

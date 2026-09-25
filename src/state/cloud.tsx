@@ -41,6 +41,8 @@ function friendly(e: unknown): string {
   if (/User already registered/i.test(msg)) return 'Já existe uma conta com esse e-mail. Use “Entrar”.';
   if (/Password should be/i.test(msg)) return 'A senha precisa ter pelo menos 6 caracteres.';
   if (/Network request failed|Failed to fetch|fetch failed/i.test(msg)) return 'Sem conexão com a internet. Seus dados continuam salvos no celular.';
+  if (/payee_rules|external_id/i.test(msg) && /column|table|schema cache|does not exist|Could not find/i.test(msg))
+    return 'O Supabase ainda não tem as tabelas do comprovante de Pix. Rode a migração 20260928000000_live_pix.sql no SQL Editor.';
   if (/goals|budget_cents/i.test(msg) && /column|table|schema cache|does not exist|Could not find/i.test(msg))
     return 'O Supabase ainda não tem as tabelas de orçamento e metas. Rode a migração 20260927000000_live_planning.sql no SQL Editor.';
   if (/credit_cards|card_id|invoice_month|invoice_payment/i.test(msg) && /column|table|schema cache|does not exist|Could not find/i.test(msg))

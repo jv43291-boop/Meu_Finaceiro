@@ -38,6 +38,8 @@ export interface EntryInput {
   cardId?: string | null;
   /** mês de vencimento da fatura (obrigatório quando há cardId) */
   invoiceMonth?: MonthKey | null;
+  /** ID do Pix/comprovante de origem */
+  externalId?: string | null;
 }
 
 export type EntryPatch = Partial<EntryInput>;
@@ -66,6 +68,7 @@ function baseTx(ctx: Ctx, input: EntryInput): Transaction {
     cardId: input.cardId ?? null,
     invoiceMonth: onCard ? (input.invoiceMonth ?? null) : null,
     invoicePayment: false,
+    externalId: input.externalId ?? null,
   };
 }
 

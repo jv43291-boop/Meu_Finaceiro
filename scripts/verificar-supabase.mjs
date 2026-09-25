@@ -40,7 +40,8 @@ const CHECKS = {
   goals: 'id,target_cents,saved_cents,server_updated_at',
   credit_cards: 'id,closing_day,server_updated_at',
   recurrences: 'id,card_id,server_updated_at',
-  transactions: 'id,card_id,invoice_month,invoice_payment,server_updated_at',
+  transactions: 'id,card_id,invoice_month,invoice_payment,external_id,server_updated_at',
+  payee_rules: 'id,match_name,match_doc,server_updated_at',
 };
 for (const [t, cols] of Object.entries(CHECKS)) {
   const r = await get(`/rest/v1/${t}?select=${cols}&limit=1`);

@@ -52,6 +52,20 @@ export interface Goal extends SyncFields {
 }
 
 /**
+ * "Pix para JOSÉ RIBEIRO = Compra de pão, categoria Padaria".
+ * Usada ao ler um comprovante: preenche descrição, categoria e conta.
+ */
+export interface PayeeRule extends SyncFields {
+  /** nome do recebedor normalizado (sem acento, minúsculo, espaços simples) */
+  matchName: string;
+  /** dígitos visíveis do CPF/CNPJ no comprovante (ex.: "123456"); null = vale só pelo nome */
+  matchDoc: string | null;
+  description: string;
+  categoryId: string | null;
+  accountId: string | null;
+}
+
+/**
  * Regra de recorrência: "R$ X todo dia D, de start até end (ou para sempre)".
  * As ocorrências não existem no banco até serem pagas, editadas ou puladas.
  */
@@ -91,6 +105,8 @@ export interface Transaction extends SyncFields {
   invoiceMonth: MonthKey | null;
   /** true = este lançamento é o pagamento da fatura (sai da conta) */
   invoicePayment: boolean;
+  /** identificador de fora do app (ID do Pix, E2E), para não lançar o mesmo comprovante duas vezes */
+  externalId?: string | null;
 }
 
 /**
