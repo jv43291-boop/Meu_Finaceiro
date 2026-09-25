@@ -36,7 +36,8 @@ else bad(`projeto não respondeu (status ${health.status}) ${health.body.slice(0
 
 const CHECKS = {
   accounts: 'id,server_updated_at',
-  categories: 'id,server_updated_at',
+  categories: 'id,budget_cents,server_updated_at',
+  goals: 'id,target_cents,saved_cents,server_updated_at',
   credit_cards: 'id,closing_day,server_updated_at',
   recurrences: 'id,card_id,server_updated_at',
   transactions: 'id,card_id,invoice_month,invoice_payment,server_updated_at',
@@ -44,7 +45,7 @@ const CHECKS = {
 for (const [t, cols] of Object.entries(CHECKS)) {
   const r = await get(`/rest/v1/${t}?select=${cols}&limit=1`);
   if (r.status === 200) ok(`tabela ${t} existe (sem login, o RLS devolve lista vazia: ${r.body})`);
-  else if (/column|PGRST204|42703/.test(r.body)) bad(`tabela ${t} sem as colunas novas — rode supabase/migrations/20260926000000_live_cards.sql`);
+  else if (/column|PGRST204|42703/.test(r.body)) bad(`tabela ${t} sem as colunas novas — rode as migrações de supabase/migrations que faltam, em ordem`);
   else if (r.status === 404 || /PGRST205|does not exist|Could not find/.test(r.body)) bad(`tabela ${t} não existe — rode as migrações de supabase/migrations em ordem`);
   else if (r.status === 401 || r.status === 403) ok(`tabela ${t} existe e está fechada para quem não entrou (status ${r.status})`);
   else bad(`tabela ${t}: status ${r.status} ${r.body.slice(0, 160)}`);
