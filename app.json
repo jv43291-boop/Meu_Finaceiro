@@ -59,6 +59,19 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fa769e19-ba6b-4c86-8c40-f8ed8e9ab2b2"
+      }
+    },
+    "owner": "victorking",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/fa769e19-ba6b-4c86-8c40-f8ed8e9ab2b2"
     }
   }
 }
