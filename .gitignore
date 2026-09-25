@@ -48,6 +48,7 @@ example
 *.backup
 *.backup.gz
 *.sql
+!supabase/migrations/*.sql
 *.dump
 backup*.json
 .env
