@@ -60,7 +60,7 @@
     "test": "vitest run",
     "icons": "node scripts/gerar-icones.mjs",
     "apk": "npx eas-cli@latest build --platform android --profile preview",
-    "atualizar": "npx eas-cli@latest update --channel preview"
+    "atualizar": "npx eas-cli@latest update --channel preview --environment preview --auto"
   },
   "private": true
 }
