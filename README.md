@@ -1,17 +1,141 @@
 # Live Finanças
 
-App de finanças pessoais em Expo (React Native), sucessor do Meu Financeiro 1.0. Pacote Android `com.victor.live` (instala ao lado do app antigo). Reescrita do zero: o celular é a fonte principal dos dados e a sincronização com o Supabase entra na fase 2.
+Aplicativo de finanças pessoais em Expo, React Native e TypeScript, sucessor do Meu Financeiro 1.0. É **offline-first**: os dados ficam no SQLite do celular e sincronizam com o Supabase quando há conexão. Pacote Android `com.victor.live`, que instala ao lado do app antigo.
 
-## Rodar
+## Visão geral
 
-```bash
-npm install
-npx expo start
+```text
+                         LIVE FINANÇAS
+                              │
+                 ┌────────────┴────────────┐
+           React Native                Expo Router
+                 └────────────┬────────────┘
+                              │
+                 Domínio (src/domain, TypeScript puro)
+                              │
+          ┌───────────────────┼───────────────────┐
+        SQLite            Supabase (RLS)     Motor de sync
+      (src/db)             (supabase/)        (src/sync)
+          └───────────────────┴───────────────────┘
+                              │
+                     Regras financeiras
+       ┌──────────────────────┼──────────────────────┐
+   Lançamentos          Cartões/Faturas         Recorrências
+       └──────────────────────┼──────────────────────┘
+                              │
+                        Planejamento
+         ┌──────────┬─────────┼─────────┬──────────┐
+    Orçamentos    Metas   Projeção   Análises   Pix/recibos
 ```
 
-Abra no Expo Go (Android) lendo o QR code, ou pressione `a` com um emulador aberto.
+## Arquitetura do projeto
 
-Verificações:
+| Camada | Responsabilidade |
+|---|---|
+| `src/app` | Rotas e telas (Expo Router) |
+| `src/domain` | Regras financeiras puras e testáveis: dinheiro, datas, recorrência, cartões, planejamento, projeção, análise, Pix, integridade |
+| `src/db` | SQLite: schema com migrações (`PRAGMA user_version`), leitura/gravação, fila local do sync e diagnóstico |
+| `src/state` | Providers: finanças, nuvem/sync, lembretes, bloqueio |
+| `src/sync` | Motor de sincronização, Supabase, relógio das alterações, isolamento entre contas |
+| `src/ui` | Componentes, tema claro/escuro, formulários, gráficos |
+| `modules/receipt-reader` | Módulo nativo próprio: PDF → imagem e leitura de texto com posição (ML Kit no Android, Vision no iOS) |
+| `supabase/migrations` | Tabelas, RLS e gatilhos do servidor |
+
+## Regras financeiras importantes
+
+- **Dinheiro em centavos (inteiros).** Nada de soma em ponto flutuante.
+- **Recorrência é uma regra**, não N cópias: "R$ X todo dia D, de início até fim (ou sem fim)". Os meses aparecem projetados e só viram registro quando pagos, editados ou pulados. Editar pergunta: só este mês, este e os próximos, ou todos. Excluir "só este mês" grava um marcador para aquele mês não voltar.
+- **Saldo por conta** = saldo inicial + tudo que já foi pago ou recebido. Não existe "fechar mês".
+- **Cartão:** a fatura é identificada pelo mês de vencimento. Compra no dia do fechamento ou depois cai na fatura seguinte. Parcelas se espalham pelas faturas seguintes, e "Todo mês" no cartão vira assinatura. Compra no cartão não mexe no saldo: o que sai da conta é o **pagamento da fatura**, que não conta de novo como gasto de categoria.
+- **Orçamentos e gasto por categoria** contam pela data da despesa. Compras no cartão entram pela data da compra, inclusive as parceladas, e os fixos previstos também entram. Pagamento de fatura fica de fora. Aviso a partir de 80% do limite; estourado acima de 100%.
+- **Fluxo de caixa, projeção e "receitas × despesas"** usam o dia em que o dinheiro entra ou sai, com as faturas no vencimento.
+- **Projeção de saldo** (Início), para 7, 30, 60 e 90 dias:
+  - o ponto de partida é o saldo de hoje; somam-se os lançamentos em aberto, os fixos, as parcelas e as faturas;
+  - a fatura aberta entra pelo valor atual somado às assinaturas previstas até o fechamento;
+  - **os atrasados não entram**: aparecem como aviso;
+  - **as metas não mexem no saldo**;
+  - dá para ver o total ou cada conta.
+- **Comprometimento da renda** = (fixos + parcelas + faturas do mês) ÷ receitas do mês. Fixos e parcelas no cartão entram só pela fatura.
+- **Metas** calculam quanto guardar por mês até a data-alvo.
+
+## Funcionalidades
+
+- Contas, categorias, lançamentos, recorrências (Fixos), parcelamentos.
+- Cartões de crédito e faturas, com pagamento parcial e restante.
+- Orçamentos por categoria, metas e relatórios:
+  - gasto por categoria;
+  - receitas × despesas em 6 meses;
+  - mês atual × anterior;
+  - indicadores do mês: comprometimento, fixos, parcelas futuras, próxima fatura e saldo em 30 dias.
+- Início com a projeção do saldo e "O que mudou este mês?".
+- **Comprovante de Pix** (Mais → Lançar comprovante de Pix, ou "Compartilhar → Live" no app do banco):
+  - a leitura é feita no aparelho: foto ou PDF → OCR → valor, recebedor, CPF/CNPJ, data, hora e ID do Pix;
+  - uma tela de conferência aparece sempre, e nada é lançado sem confirmação;
+  - **regras por recebedor** (ex.: "José Ribeiro" vira "Compra de pão"), com sugestão pelo histórico quando não há regra;
+  - aviso de comprovante repetido;
+  - funciona só no APK, porque usa o módulo nativo.
+- Lembretes de vencimento: notificações locais que agrupam o mesmo dia, com opção de esconder o valor na tela bloqueada.
+- Bloqueio com digital ou rosto, com a senha do celular como alternativa.
+- Exportar para planilha: CSV no padrão brasileiro.
+- Importar o backup do Meu Financeiro 1.0.
+- Personalizar: tema claro/escuro, cor de destaque, foto de fundo e "esconder valores".
+- Diagnóstico (Mais → Avançado):
+  - SQLite, registros por tabela, conta, Supabase, estado da sincronização e relógio;
+  - "Revalidar integridade", que só aponta problemas, sem corrigir;
+  - compartilhar o diagnóstico sem valores nem nomes.
+
+## Offline-first e sincronização
+
+```text
+Pessoa ─► SQLite no celular ─► app funciona sem internet
+                  │
+       fila (dirty + quarentena local)
+                  │
+              Supabase ─► RLS por usuário, chave (user_id, id)
+```
+
+- **Sincroniza sozinho:** ao abrir o app, 3 s depois de cada alteração, a cada 5 min e no botão. Um registro por vez, e vence a alteração mais recente. O gatilho `live_sync_stamp` do servidor ignora versões mais antigas.
+- **Relógio das alterações** (`src/sync/clock.ts`):
+  - nunca volta para trás: cada alteração fica depois de qualquer versão que o aparelho já viu;
+  - é corrigido pela hora do servidor; acima de 2 min de diferença, o app avisa.
+- **Fila:**
+  - um registro recusado pelo servidor vai para a quarentena e não trava o resto;
+  - ele é tentado de novo em 5 min, 15 min, 1 h e depois a cada 6 h, ou na hora se for editado;
+  - sem internet, o estado é "sem internet", com novas tentativas em 30 s, 1, 2, 5, 10, 20 e 30 min;
+  - em Conta e sincronização aparecem as pendências e os recusados, com "Tentar de novo" e "Descartar".
+- **Isolamento entre contas** (`src/sync/account.ts`):
+  - sair da conta envia o que está pendente (e avisa se não conseguir) e **apaga tudo do aparelho**: dados, preferências, foto de fundo, lembretes, bloqueio e cache;
+  - entrar numa conta diferente da dona do aparelho apaga antes de sincronizar;
+  - dados criados sem conta sobem para a primeira conta que entrar;
+  - a conta e as categorias padrão nascem com data antiga, para nunca sobrescrever a versão da nuvem.
+
+### Configurar o Supabase
+
+1. No **SQL Editor** do projeto, rode em ordem os arquivos de `supabase/migrations`:
+   - `20260925000000_live_sync.sql`: tabelas, RLS e gatilho;
+   - `20260926000000_live_cards.sql`: cartões;
+   - `20260927000000_live_planning.sql`: orçamentos e metas;
+   - `20260928000000_live_pix.sql`: ID do Pix e regras de recebedor;
+   - `20260929000000_live_isolamento.sql`: chave `(user_id, id)`.
+
+   Nenhum deles mexe na tabela antiga `finance_backups`.
+2. Copie `.env.example` para `.env` e preencha `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` com a chave **publishable**. Nunca use a chave secret/service_role no app.
+3. `node scripts/verificar-supabase.mjs` confere se o projeto responde e se as tabelas existem. O script nunca mostra a chave.
+
+Ao entrar com a conta do app antigo, o Live encontra o backup em `finance_backups` e oferece a importação.
+
+## Testes
+
+```text
+TESTES (vitest)
+├── Domínio ........ dinheiro, datas, recorrência, operações, CSV, lembretes
+├── Cartões ........ fatura, parcelas, pagamento
+├── Planejamento ... orçamentos, metas, projeção, análise do mês
+├── Pix/recibo ..... parser, casos ambíguos, regras, histórico
+├── Integridade .... checagens e diagnóstico sem dados sensíveis
+└── Sync/offline ... motor, relógio, fila/quarentena, isolamento A↔B
+                     (SQLite real via sql.js, só nos testes)
+```
 
 ```bash
 npm run typecheck
@@ -19,64 +143,26 @@ npm run lint
 npm test
 ```
 
-## Estrutura
+Todos os dados dos testes são fictícios.
 
-| Pasta | O que tem |
-|---|---|
-| `src/domain` | Regras puras em TypeScript (dinheiro, datas, recorrência, resumo, importação). Sem React, com testes. |
-| `src/db` | Schema SQLite com migrações (`PRAGMA user_version`) e leitura/gravação. |
-| `src/state` | `FinanceProvider`: carrega o banco e expõe as ações para as telas. |
-| `src/ui` | Componentes, tema claro/escuro, formulário de lançamento. |
-| `src/app` | Telas (expo-router). |
+## Desenvolvimento
 
-## Decisões
+```bash
+npm install
+npx expo start
+```
 
-- **Valores em centavos (inteiro).** Nada de soma em ponto flutuante.
-- **Recorrência é uma regra**, não N cópias: "R$ X todo dia D, de início até fim (ou sem fim)". Os meses aparecem projetados e só são gravados quando pagos, editados ou pulados. Editar pergunta: só este mês, este e os próximos, ou todos.
-- **Excluir "só este mês"** grava um marcador (registro com `deleted_at`) para aquele mês não reaparecer.
-- **Saldo por conta** = saldo inicial + tudo que foi marcado como pago/recebido. Não existe "fechar mês": o saldo passa de um mês para o outro naturalmente, positivo ou negativo.
-- **Toda tabela tem `updated_at`, `deleted_at` e `dirty`**, prontos para a sincronização registro a registro da fase 2.
-
-## Visual
-
-- Violeta `#5B45FF` como destaque padrão, fonte Plus Jakarta Sans, tema claro e escuro.
-- **Mais → Personalizar**: foto de fundo da galeria, intensidade do véu (suave/médio/forte), desfoque, cor de destaque (violeta, azul, verde, rosa, laranja) e tema. A foto é reduzida para no máximo 1440 px e copiada para dentro do app; preenche a tela em qualquer proporção sem distorcer, e um véu na cor do tema mantém os textos legíveis. Se o arquivo sumir, o app volta ao fundo normal. Essas escolhas ficam só no aparelho (não sincronizam).
-- Ícone e splash saem de `assets/brand/logo.svg`. Depois de mudar o desenho, rode `npm run icons` para gerar os PNGs.
-- O Expo Go mostra o ícone dele; o ícone e o splash do Live só aparecem num build (`npx eas-cli@latest build -p android --profile preview`).
-
-## Nuvem (Supabase)
-
-Os dados ficam no celular e sincronizam sozinhos com o Supabase: ao abrir o app, alguns segundos depois de cada alteração e a cada 5 minutos. Vence a alteração mais recente de cada registro.
-
-1. No Supabase (projeto `xnsajwmjezhabawctxla`), abra o **SQL Editor** e rode, em ordem, os arquivos de `supabase/migrations` (`20260925000000_live_sync.sql`, `20260926000000_live_cards.sql` e `20260927000000_live_planning.sql`). Eles criam `accounts`, `categories`, `credit_cards`, `goals`, `recurrences` e `transactions` com RLS por usuário e não mexe na tabela antiga `finance_backups`.
-2. Copie `.env.example` para `.env` e cole a chave **publishable** em `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Nunca use a chave secreta ou service_role no app.
-3. Reinicie o `npx expo start` e entre em **Mais → Conta e sincronização**.
-
-Ao entrar com a mesma conta do app antigo, o Live encontra o backup em `finance_backups` e oferece a importação.
-
-## Cartão de crédito
-
-- **Mais → Cartões**: nome, limite, dia de fechamento e de vencimento, conta que paga a fatura.
-- No lançamento, **Pagar com** mostra contas e cartões. No cartão, a compra entra na fatura pela data (compra no dia do fechamento ou depois vai para a próxima); dá para empurrar para outra fatura. Parcelado no cartão espalha as parcelas pelas faturas seguintes; "Todo mês" no cartão vira assinatura.
-- A fatura é identificada pelo mês de vencimento. Compras no cartão não mexem no saldo; o que sai da conta é o pagamento da fatura, que aparece no Extrato e no Início no dia do vencimento.
-- Pagamento parcial ou compra lançada depois de pagar aparece como "restante".
-- Para sincronizar cartões, rode também `supabase/migrations/20260926000000_live_cards.sql`. `node scripts/verificar-supabase.mjs` confere tudo.
-
-## Planejamento
-
-- **Orçamentos** (Mais → Orçamentos): limite mensal por categoria de despesa. Conta tudo do mês pela data da despesa — o que foi pago, compras no cartão (pela data da compra) e contas fixas previstas; pagamento de fatura não entra, para não contar duas vezes. Aviso a partir de 80%, estourado acima de 100%, sempre com ícone e texto.
-- **Metas** (Mais → Metas): valor-alvo, quanto já tem e data opcional; mostra quanto guardar por mês. Guardar/retirar mudam só o valor da meta.
-- **Relatórios** (Mais → Relatórios): gastos por categoria no mês e receitas × despesas dos últimos 6 meses pelo fluxo de caixa (faturas no vencimento). As cores do gráfico foram validadas para daltonismo nos temas claro e escuro.
-- Para sincronizar orçamentos e metas, rode `supabase/migrations/20260927000000_live_planning.sql`.
-
-## Importar do app antigo
-
-Em **Mais → Importar do app antigo**, escolha o JSON do backup (o `payload` da tabela `finance_backups`) ou cole o texto. Lançamentos recorrentes viram regras mensais de verdade.
+- Expo Go serve para telas e lógica. Comprovante de Pix, ícone e splash só aparecem no APK.
+- `npm run apk`: gera o APK de teste no EAS (perfil `preview`). É necessário quando entra código nativo.
+- `npm run atualizar`: manda a atualização pelo ar (EAS Update, canal `preview`). Serve para mudança só de tela ou de lógica.
+- `npm run icons`: gera ícone e splash a partir de `assets/brand/logo.svg`.
 
 ## Roteiro
 
-1. ~~Base local: contas, categorias, lançamentos, recorrência, parcelas, importação~~
-2. ~~Login e sincronização automática com Supabase (tabelas novas + RLS)~~
-3. ~~Cartão de crédito e faturas~~
-4. ~~Orçamentos, metas e relatórios~~
-5. Lembretes de vencimento, exportar CSV, biometria
+Só o que ainda **não** existe no código:
+
+- Assistente com IA, que interpreta os números calculados pelo domínio. Aguarda decisão sobre custo, provedor e privacidade; precisa de back-end, porque a chave não pode ficar no app.
+- Ajuste da leitura de comprovante com exemplos reais de cada banco (Itaú, Santander, PicPay, Nubank, Banco do Brasil, Caixa Tem, Caixa e Bradesco).
+- Transferência entre contas; importar extrato (OFX/CSV); backup em arquivo sem nuvem; widget no Android.
+- Resumo do comprometimento futuro do cartão; notificação de saldo projetado baixo.
+- Finanças familiares (compartilhamento e permissões); relatórios em PDF.
