@@ -6,7 +6,7 @@ import { ActivityIndicator, Platform, View } from 'react-native';
 
 import { formatDateBR, parseDateBR, todayISO, type DateISO } from '@/domain/dates';
 import { formatBRL, formatPlain, parseMoney } from '@/domain/money';
-import { findDuplicatePix, findPayeeRule, normalizeName, upsertPayeeRule } from '@/domain/payeeRules';
+import { findDuplicatePix, findPayeeRule, normalizeName, suggestFromHistory, upsertPayeeRule } from '@/domain/payeeRules';
 import type { EntryType } from '@/domain/types';
 import { ctx, useFinance } from '@/state/finance';
 import { Button, Card, Chip, Empty, Field, Input, Pill, Screen, Segmented, SwitchRow, T, tapFeedback } from '@/ui/components';
@@ -55,6 +55,7 @@ export default function ReceiptScreen() {
   const [accountId, setAccountId] = useState<string | null>(f.defaultAccountId);
   const [dateText, setDateText] = useState(formatDateBR(todayISO()));
   const [remember, setRemember] = useState(true);
+  const [fromHistory, setFromHistory] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const receipt = result?.receipt ?? null;
@@ -68,11 +69,14 @@ export default function ReceiptScreen() {
     try {
       const r = await readReceipt(file);
       const found = findPayeeRule(f.payeeRules, r.receipt.counterpartName, r.receipt.counterpartDoc);
+      // sem regra: sugere pelo que a pessoa já lançou para esse recebedor
+      const hist = found ? null : suggestFromHistory(f.transactions, r.receipt.counterpartName);
+      setFromHistory(!!hist);
       setResult(r);
       setType(r.receipt.direction === 'received' ? 'income' : 'expense');
       setAmount(r.receipt.amountCents ? formatPlain(r.receipt.amountCents) : '');
-      setDescription(found?.description ?? (r.receipt.counterpartName ? titleCase(r.receipt.counterpartName) : 'Pix'));
-      setCategoryId(found?.categoryId ?? null);
+      setDescription(found?.description ?? hist?.description ?? (r.receipt.counterpartName ? titleCase(r.receipt.counterpartName) : 'Pix'));
+      setCategoryId(found?.categoryId ?? hist?.categoryId ?? null);
       setAccountId(found?.accountId ?? f.defaultAccountId);
       setDateText(formatDateBR(r.receipt.date ?? todayISO()));
       setRemember(!found);
@@ -188,7 +192,7 @@ export default function ReceiptScreen() {
               {doc ? <T variant="caption">{maskDoc(doc)}</T> : null}
               <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
                 {receipt.bank ? <Pill tone="primary" label={receipt.bank} /> : null}
-                {rule ? <Pill tone="primary" label="regra salva" /> : null}
+                {rule ? <Pill tone="primary" label="regra salva" /> : fromHistory ? <Pill tone="primary" label="sugerido pelo histórico" /> : null}
                 {!receipt.looksLikePix ? <Pill label="não parece Pix" /> : null}
               </View>
             </View>

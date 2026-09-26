@@ -168,3 +168,25 @@ describe('regras por recebedor', () => {
     expect(findDuplicatePix(tx, null)).toBeNull();
   });
 });
+
+describe('sugestão pelo histórico (sem regra salva)', () => {
+  const t = (description: string, categoryId: string | null, notes: string, date = '2026-09-01', deletedAt: string | null = null) => ({ description, categoryId, notes, date, deletedAt });
+  it('usa o par descrição+categoria mais frequente para o mesmo recebedor', async () => {
+    const { suggestFromHistory } = await import('../payeeRules');
+    const tx = [
+      t('Pão', 'padaria', 'Pix para JOSÉ RIBEIRO · via Nubank', '2026-09-01'),
+      t('Pão', 'padaria', 'Pix para JOSE RIBEIRO', '2026-09-10'),
+      t('Bolo', 'padaria', 'Pix para Jose Ribeiro', '2026-09-20'),
+      t('Aluguel', 'moradia', 'Pix para MARIA EXEMPLO'),
+      t('Pão', 'lazer', 'Pix para JOSE RIBEIRO', '2026-09-25', '2026-09-26'), // excluído: não conta
+    ];
+    expect(suggestFromHistory(tx, 'José Ribeiro')).toEqual({ description: 'Pão', categoryId: 'padaria', count: 2 });
+    expect(suggestFromHistory(tx, 'Fulano')).toBeNull();
+    expect(suggestFromHistory(tx, null)).toBeNull();
+  });
+  it('empate: fica com o mais recente', async () => {
+    const { suggestFromHistory } = await import('../payeeRules');
+    const tx = [t('Pão', 'padaria', 'Pix para ANA', '2026-09-01'), t('Café', 'padaria', 'Pix para ANA', '2026-09-20')];
+    expect(suggestFromHistory(tx, 'Ana')?.description).toBe('Café');
+  });
+});

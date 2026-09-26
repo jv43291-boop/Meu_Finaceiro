@@ -82,7 +82,7 @@ export function rowsFromText(text: string): Row[] {
 
 // ---------- valores ----------
 
-const MONEY = /(?:r\s?\$|rs\b|r\$)\s*-?\s*(\d{1,3}(?:[.\s]\d{3})*,\d{2}|\d+,\d{2})/i;
+const MONEY = /(?:r\s?\$|rs(?=\s*-?\s*\d))\s*-?\s*(\d{1,3}(?:[.\s]\d{3})*,\d{2}|\d+,\d{2})/i;
 const MONEY_LOOSE = /(?:^|\s)(\d{1,3}(?:\.\d{3})*,\d{2})(?:\s|$)/;
 
 export function parseMoneyBR(s: string, loose = false): number | null {

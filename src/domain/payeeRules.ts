@@ -52,3 +52,38 @@ export function findDuplicatePix<T extends { externalId?: string | null; deleted
   if (!pixId) return null;
   return transactions.find((t) => !t.deletedAt && t.externalId === pixId) ?? null;
 }
+
+export interface HistorySuggestion {
+  description: string;
+  categoryId: string | null;
+  /** quantos Pix anteriores para essa pessoa usaram essa descrição/categoria */
+  count: number;
+}
+
+/**
+ * Sem regra salva: sugere pelo histórico. Os lançamentos feitos pelo comprovante
+ * guardam "Pix para NOME" nas observações; o par descrição+categoria mais usado
+ * com esse recebedor vira a sugestão (empate: o mais recente). Só sugere — a
+ * pessoa confirma na tela de conferência.
+ */
+export function suggestFromHistory(
+  transactions: { notes: string; description: string; categoryId: string | null; date: string; deletedAt: string | null }[],
+  name: string | null,
+): HistorySuggestion | null {
+  if (!name) return null;
+  const key = normalizeName(name);
+  if (!key) return null;
+  const groups = new Map<string, HistorySuggestion & { last: string }>();
+  for (const t of transactions) {
+    if (t.deletedAt) continue;
+    const m = /^Pix (?:para|de) (.+?)(?: · |$)/.exec(t.notes ?? '');
+    if (!m || normalizeName(m[1]) !== key) continue;
+    const g = `${t.description}\u0000${t.categoryId ?? ''}`;
+    const cur = groups.get(g) ?? { description: t.description, categoryId: t.categoryId, count: 0, last: '' };
+    cur.count++;
+    if (t.date > cur.last) cur.last = t.date;
+    groups.set(g, cur);
+  }
+  const best = [...groups.values()].sort((a, b) => b.count - a.count || (a.last < b.last ? 1 : -1))[0];
+  return best ? { description: best.description, categoryId: best.categoryId, count: best.count } : null;
+}
