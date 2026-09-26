@@ -5,6 +5,7 @@ import { currentMonthKey, monthLabel, todayISO } from '@/domain/dates';
 import { formatBRL } from '@/domain/money';
 import { budgetLines, budgetTotals, monthlySeries, spendByCategory } from '@/domain/planning';
 import { useFinance } from '@/state/finance';
+import { MonthChanges, MonthIndicators } from '@/ui/Analysis';
 import { HBarList, MonthBars } from '@/ui/Charts';
 import { Card, Empty, MonthSwitcher, Screen, T } from '@/ui/components';
 import { useColors, useHideValues } from '@/ui/theme';
@@ -44,6 +45,10 @@ export default function ReportsScreen() {
         <T variant="caption">{monthLabel(month)} · total {money(data.total)} (inclui cartão pela data da compra e contas fixas previstas)</T>
         {data.rows.length ? <HBarList rows={data.rows} total={data.total} /> : <Empty icon="chart-bar" title="Sem gastos neste mês" />}
       </Card>
+
+      <MonthChanges month={month} />
+
+      <MonthIndicators month={month} />
 
       <Card>
         <T variant="heading">Receitas × despesas</T>

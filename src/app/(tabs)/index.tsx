@@ -11,6 +11,7 @@ import { Amount, Card, Empty, IconButton, ListRow, Pill, Screen, T } from '@/ui/
 import { BudgetBar } from '@/ui/Charts';
 import { ItemRow } from '@/ui/ItemRow';
 import { ProjectionCard } from '@/ui/ProjectionCard';
+import { MonthChanges } from '@/ui/Analysis';
 import { openItem } from '@/ui/nav';
 import { radius, space, useAppTheme, useColors } from '@/ui/theme';
 
@@ -105,6 +106,7 @@ export default function HomeScreen() {
       )}
 
       {!empty ? <ProjectionCard /> : null}
+      {!empty ? <MonthChanges month={month} limit={4} compact /> : null}
 
       {budget.totals.budgetCents > 0 || topGoal ? (
         <Card style={{ gap: space.md }}>
