@@ -10,6 +10,7 @@ import { useFinance } from '@/state/finance';
 import { Amount, Card, Empty, IconButton, ListRow, Pill, Screen, T } from '@/ui/components';
 import { BudgetBar } from '@/ui/Charts';
 import { ItemRow } from '@/ui/ItemRow';
+import { ProjectionCard } from '@/ui/ProjectionCard';
 import { openItem } from '@/ui/nav';
 import { radius, space, useAppTheme, useColors } from '@/ui/theme';
 
@@ -102,6 +103,8 @@ export default function HomeScreen() {
           ) : null}
         </Card>
       )}
+
+      {!empty ? <ProjectionCard /> : null}
 
       {budget.totals.budgetCents > 0 || topGoal ? (
         <Card style={{ gap: space.md }}>
