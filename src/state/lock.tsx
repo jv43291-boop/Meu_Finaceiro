@@ -12,6 +12,7 @@ import { AppState, Platform, StyleSheet, View } from 'react-native';
 
 import { getMeta, setMeta } from '@/db/repo';
 import { Button, Icon, T } from '@/ui/components';
+import { onDeviceReset } from './events';
 import { space, useColors } from '@/ui/theme';
 
 const KEY = 'lock_enabled';
@@ -101,6 +102,16 @@ export function LockProvider({ children }: { children: ReactNode }) {
       }
     })();
   }, [db, unlock]);
+
+  // saiu da conta: o bloqueio era da pessoa, não do celular
+  useEffect(
+    () =>
+      onDeviceReset(() => {
+        setEnabledState(false);
+        setLocked(false);
+      }),
+    [],
+  );
 
   useEffect(() => {
     if (!lockSupported || !enabled) return;

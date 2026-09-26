@@ -239,6 +239,16 @@ export async function wipeLocalData(db: SQLiteDatabase) {
   });
 }
 
+/**
+ * Apaga TUDO o que é da pessoa no aparelho: dados financeiros, estado da
+ * sincronização e as preferências (tema, cor, foto de fundo, esconder valores,
+ * lembretes, bloqueio). Decisão do João: nada de uma pessoa pode aparecer para outra.
+ */
+export async function wipeDevice(db: SQLiteDatabase) {
+  await wipeLocalData(db);
+  await db.runAsync('DELETE FROM meta');
+}
+
 export async function getMeta(db: SQLiteDatabase, key: string): Promise<string | null> {
   const r = await db.getFirstAsync<{ value: string }>('SELECT value FROM meta WHERE key = ?', key);
   return r?.value ?? null;

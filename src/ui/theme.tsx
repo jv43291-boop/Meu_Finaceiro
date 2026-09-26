@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { Appearance, useColorScheme } from 'react-native';
 
 import { getMeta, setMeta } from '@/db/repo';
+import { onDeviceReset } from '@/state/events';
 
 const light = {
   background: '#F6F7F9',
@@ -198,6 +199,18 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
       .then((v) => setHide(v === '1'))
       .catch(() => undefined);
   }, [db]);
+
+  // saiu da conta: tema, cor, foto e "esconder valores" voltam ao padrão
+  useEffect(
+    () =>
+      onDeviceReset(() => {
+        setPref('system');
+        setHide(false);
+        setAccentState('violeta');
+        setBgState(DEFAULT_BG);
+      }),
+    [],
+  );
 
   useEffect(() => {
     Appearance.setColorScheme?.(preference === 'system' ? 'unspecified' : preference);

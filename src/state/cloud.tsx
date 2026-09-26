@@ -9,7 +9,8 @@ import { clearDeviceAfterSignOut, prepareDeviceForUser } from '@/sync/account';
 import { SyncError, syncOnce } from '@/sync/engine';
 import { appClock } from '@/sync/clock';
 import { cloudConfigured, createRemoteStore, fetchLegacyBackup, fetchRemoteRow, measureClockOffset, supabase } from '@/sync/supabase';
-import { onLocalChange } from './events';
+import { clearPersonalFiles } from '@/ui/deviceFiles';
+import { emitDeviceReset, onLocalChange } from './events';
 import { ctx, useFinance } from './finance';
 
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'offline' | 'error';
@@ -194,7 +195,11 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       const action = await prepareDeviceForUser(db, uid, ctx.newId);
-      if (action === 'wipe-other') await reload();
+      if (action === 'wipe-other') {
+        clearPersonalFiles();
+        emitDeviceReset();
+        await reload();
+      }
       if (cancelled) return;
       await syncNow();
       if ((await getMeta(db, legacyKey(uid))) !== '1') {
@@ -282,6 +287,10 @@ export function CloudProvider({ children }: { children: ReactNode }) {
         setLegacyBackup(null);
         // os dados eram desta conta: não ficam no aparelho para a próxima pessoa
         await clearDeviceAfterSignOut(db, ctx.newId);
+        clearPersonalFiles();
+        appClock.setOffset(null);
+        setClockSkewMs(null);
+        emitDeviceReset();
         await reload();
         setLastSyncAt(null);
         setLastError(null);

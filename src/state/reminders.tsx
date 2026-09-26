@@ -14,6 +14,7 @@ import { AppState, Platform } from 'react-native';
 
 import { getMeta, setMeta } from '@/db/repo';
 import { DEFAULT_REMINDERS, parseReminderSettings, planReminders, type ReminderSettings } from '@/domain/reminders';
+import { onDeviceReset } from './events';
 import { useFinance } from './finance';
 
 const KEY = 'reminders';
@@ -77,6 +78,9 @@ export function RemindersProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoaded(true));
     if (remindersSupported) readPermission().then(setPermission).catch(() => undefined);
   }, [db]);
+
+  // saiu da conta: lembretes desligados (o reagendamento abaixo cancela os avisos da pessoa)
+  useEffect(() => onDeviceReset(() => setSettings(DEFAULT_REMINDERS)), []);
 
   // volta para a frente: reagenda (o dia pode ter virado) e relê a permissão
   useEffect(() => {

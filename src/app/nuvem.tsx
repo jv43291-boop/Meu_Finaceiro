@@ -247,7 +247,7 @@ export default function CloudScreen() {
         variant="danger"
         icon="logout"
         onPress={async () => {
-          const ok = await confirmAsk('Sair da conta?', 'Seus dados ficam guardados na nuvem e são apagados deste celular. Ao entrar de novo, eles voltam.', 'Sair', true);
+          const ok = await confirmAsk('Sair da conta?', 'Seus dados ficam guardados na nuvem e são apagados deste celular, junto com tema, cor, foto de fundo, lembretes e bloqueio. Ao entrar de novo, os dados voltam; as preferências você escolhe de novo.', 'Sair', true);
           if (!ok) return;
           const r = await cloud.signOut();
           if (!r.done) {

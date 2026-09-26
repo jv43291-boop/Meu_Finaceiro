@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { openTestDb } from '../../db/__tests__/sqljsDb';
-import { applyChanges, loadAll, seedIfEmpty, upsertAccount } from '../../db/repo';
+import { applyChanges, getMeta, loadAll, seedIfEmpty, setMeta, upsertAccount } from '../../db/repo';
 import { countDirty, createLocalStore } from '../../db/syncStore';
 import { createEntry, type Ctx } from '../../domain/operations';
 import { clearDeviceAfterSignOut, decideSignIn, prepareDeviceForUser } from '../account';
@@ -168,4 +168,26 @@ describe('P0: A e B no mesmo celular', () => {
     await entrar(db, server, A);
     expect((await loadAll(db)).accounts.map((a) => a.name)).toEqual(['Nubank do A']);
   });
+
+  it('preferências de A (tema, cor, foto, lembretes, bloqueio) também somem ao sair', async () => {
+    await entrar(db, server, A);
+    for (const [k, v] of [['theme', 'dark'], ['accent', 'rosa'], ['background', '{"uri":"file:///fundo/a.jpg"}'], ['hide_values', '1'], ['reminders', '{"enabled":true}'], ['lock_enabled', '1']]) {
+      await setMeta(db, k, v);
+    }
+    await sair(db, server, A);
+    const left = await db.getAllAsync<{ key: string }>('SELECT key FROM meta');
+    expect(left).toEqual([]);
+    await entrar(db, server, B);
+    expect(await getMeta(db, 'background')).toBeNull();
+    expect(await getMeta(db, 'lock_enabled')).toBeNull();
+  });
+
+  it('app antigo: B entrando também apaga as preferências de A', async () => {
+    await entrar(db, server, A);
+    await setMeta(db, 'background', '{"uri":"file:///fundo/a.jpg"}');
+    await entrar(db, server, B); // A nunca saiu
+    expect(await getMeta(db, 'background')).toBeNull();
+    expect(await getMeta(db, 'sync_user_id')).toBe(B);
+  });
 });
+
