@@ -2,7 +2,6 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import Storage from 'expo-sqlite/kv-store';
 import { AppState, Platform } from 'react-native';
 
-import type { RemoteRow, RemoteStore, SyncTable } from './engine';
 
 /**
  * Credenciais vêm do arquivo .env (não versionado):
@@ -36,21 +35,7 @@ if (supabase && Platform.OS !== 'web') {
   });
 }
 
-export function createRemoteStore(client: SupabaseClient): RemoteStore {
-  return {
-    async upsert(table: SyncTable, rows: RemoteRow[]) {
-      const { error } = await client.from(table).upsert(rows, { onConflict: 'id' });
-      if (error) throw new Error(`Falha ao enviar ${table}: ${error.message}`);
-    },
-    async pullSince(table: SyncTable, since: string | null, limit: number) {
-      let q = client.from(table).select('*').order('server_updated_at', { ascending: true }).order('id').limit(limit);
-      if (since) q = q.gt('server_updated_at', since);
-      const { data, error } = await q;
-      if (error) throw new Error(`Falha ao baixar ${table}: ${error.message}`);
-      return (data ?? []) as RemoteRow[];
-    },
-  };
-}
+export { createRemoteStore } from './remote';
 
 /** Backup do app antigo (tabela finance_backups), se existir para este usuário. */
 export async function fetchLegacyBackup(client: SupabaseClient): Promise<unknown | null> {

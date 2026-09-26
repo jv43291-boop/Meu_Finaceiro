@@ -134,8 +134,18 @@ export default function CloudScreen() {
         variant="danger"
         icon="logout"
         onPress={async () => {
-          const ok = await confirmAsk('Sair da conta?', 'Os dados continuam neste celular. Ao entrar de novo, a sincronização continua de onde parou.', 'Sair', true);
-          if (ok) await cloud.signOut();
+          const ok = await confirmAsk('Sair da conta?', 'Seus dados ficam guardados na nuvem e são apagados deste celular. Ao entrar de novo, eles voltam.', 'Sair', true);
+          if (!ok) return;
+          const r = await cloud.signOut();
+          if (!r.done) {
+            const force = await confirmAsk(
+              'Há alterações não enviadas',
+              `${r.pending === 1 ? '1 alteração ainda não foi enviada' : `${r.pending} alterações ainda não foram enviadas`} para a nuvem (sem internet?). Se sair agora, elas se perdem.`,
+              'Sair mesmo assim',
+              true,
+            );
+            if (force) await cloud.signOut({ force: true });
+          }
         }}
       />
     </Screen>

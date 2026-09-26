@@ -196,8 +196,15 @@ export async function applyChanges(db: SQLiteDatabase, changes: Changes, extra?:
   });
 }
 
+/**
+ * Data fixa e antiga dos itens padrão: se a pessoa já tem essa conta/categoria
+ * na nuvem (renomeada, com orçamento...), a versão dela sempre vence a padrão.
+ */
+export const SEED_TIME = '2000-01-01T00:00:00.000Z';
+
 /** Cria conta e categorias padrão no primeiro uso. */
-export async function seedIfEmpty(db: SQLiteDatabase, _newId: () => string, now: string) {
+export async function seedIfEmpty(db: SQLiteDatabase, _newId: () => string, _now?: string) {
+  const now = SEED_TIME;
   const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM accounts');
   if ((row?.n ?? 0) > 0) return;
   await db.withTransactionAsync(async () => {
@@ -212,6 +219,22 @@ export async function seedIfEmpty(db: SQLiteDatabase, _newId: () => string, now:
         createdAt: now, updatedAt: now, deletedAt: null,
       });
     }
+  });
+}
+
+/** Tabelas com dados da pessoa (apagadas ao sair da conta). */
+const DATA_TABLES = ['transactions', 'recurrences', 'payee_rules', 'goals', 'credit_cards', 'categories', 'accounts'] as const;
+
+/**
+ * Apaga do aparelho os dados financeiros e o estado da sincronização.
+ * Mantém as preferências do aparelho (tema, cor, foto, lembretes, bloqueio).
+ */
+export async function wipeLocalData(db: SQLiteDatabase) {
+  await db.withTransactionAsync(async () => {
+    for (const t of DATA_TABLES) await db.runAsync(`DELETE FROM ${t}`);
+    await db.runAsync(
+      "DELETE FROM meta WHERE key LIKE 'sync_cursor:%' OR key LIKE 'legacy_checked:%' OR key IN ('sync_user_id', 'last_sync_at')",
+    );
   });
 }
 

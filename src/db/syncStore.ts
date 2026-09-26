@@ -140,3 +140,13 @@ export async function markAllDirty(db: SQLiteDatabase) {
     }
   });
 }
+
+/** Quantos registros ainda não foram enviados para a nuvem. */
+export async function countDirty(db: SQLiteDatabase): Promise<number> {
+  let n = 0;
+  for (const t of SYNC_TABLES) {
+    const r = await db.getFirstAsync<{ n: number }>(`SELECT COUNT(*) AS n FROM ${t} WHERE dirty = 1`);
+    n += r?.n ?? 0;
+  }
+  return n;
+}

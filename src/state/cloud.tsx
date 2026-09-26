@@ -3,12 +3,12 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
-import { getMeta, setMeta } from '@/db/repo';
-import { SYNC_USER_KEY, createLocalStore, markAllDirty, resetSyncCursors } from '@/db/syncStore';
+import { getMeta, seedIfEmpty, setMeta, wipeLocalData } from '@/db/repo';
+import { SYNC_USER_KEY, countDirty, createLocalStore, markAllDirty, resetSyncCursors } from '@/db/syncStore';
 import { syncOnce } from '@/sync/engine';
 import { cloudConfigured, createRemoteStore, fetchLegacyBackup, supabase } from '@/sync/supabase';
 import { onLocalChange } from './events';
-import { useFinance } from './finance';
+import { ctx, useFinance } from './finance';
 
 export type SyncStatus = 'off' | 'idle' | 'syncing' | 'error';
 
@@ -23,7 +23,12 @@ interface CloudValue {
   legacyBackup: unknown | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
-  signOut: () => Promise<void>;
+  /**
+   * Envia o pendente e sai, apagando os dados deste celular.
+   * Se sobrar algo sem enviar (sem internet), não sai e devolve quantos são;
+   * chame de novo com force para sair mesmo assim.
+   */
+  signOut: (opts?: { force?: boolean }) => Promise<{ done: true } | { done: false; pending: number }>;
   syncNow: () => Promise<void>;
   dismissLegacy: () => Promise<void>;
 }
@@ -82,7 +87,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     try {
       do {
         again.current = false;
-        const result = await syncOnce(createLocalStore(db), createRemoteStore(supabase));
+        const result = await syncOnce(createLocalStore(db), createRemoteStore(supabase, session.user.id));
         if (result.changedLocally > 0) await reload();
       } while (again.current);
       const now = new Date().toISOString();
@@ -105,8 +110,15 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       const owner = await getMeta(db, SYNC_USER_KEY);
-      if (owner !== uid) {
-        // primeira vez desta conta neste aparelho: sobe tudo o que existe aqui
+      if (owner && owner !== uid) {
+        // o aparelho tem dados de OUTRA conta (ex.: versão antiga não apagava ao sair):
+        // nunca misturar — apaga daqui e baixa os da conta que entrou
+        await wipeLocalData(db);
+        await seedIfEmpty(db, ctx.newId);
+        await setMeta(db, SYNC_USER_KEY, uid);
+        await reload();
+      } else if (!owner) {
+        // dados criados sem conta: sobem para a conta na primeira entrada
         await resetSyncCursors(db);
         await markAllDirty(db);
         await setMeta(db, SYNC_USER_KEY, uid);
@@ -172,10 +184,22 @@ export function CloudProvider({ children }: { children: ReactNode }) {
         if (error) throw new Error(friendly(error));
         return { needsConfirmation: !data.session };
       },
-      async signOut() {
-        if (!supabase) return;
+      async signOut(opts) {
+        if (!supabase) return { done: true };
+        if (!opts?.force) {
+          await syncNow();
+          const pending = await countDirty(db);
+          if (pending > 0) return { done: false, pending };
+        }
         await supabase.auth.signOut();
         setLegacyBackup(null);
+        // os dados eram desta conta: não ficam no aparelho para a próxima pessoa
+        await wipeLocalData(db);
+        await seedIfEmpty(db, ctx.newId);
+        await reload();
+        setLastSyncAt(null);
+        setLastError(null);
+        return { done: true };
       },
       syncNow,
       async dismissLegacy() {
@@ -184,7 +208,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
         setLegacyBackup(null);
       },
     }),
-    [session, status, lastSyncAt, lastError, legacyBackup, syncNow, db],
+    [session, status, lastSyncAt, lastError, legacyBackup, syncNow, db, reload],
   );
 
   return <CloudContext.Provider value={value}>{children}</CloudContext.Provider>;
