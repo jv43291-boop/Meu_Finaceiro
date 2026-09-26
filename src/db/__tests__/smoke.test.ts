@@ -14,3 +14,14 @@ describe('banco de teste', () => {
     expect(snap.categories.length).toBeGreaterThan(5);
   });
 });
+
+describe('saúde do SQLite', () => {
+  it('integrity_check ok e contagens por tabela', async () => {
+    const { sqliteHealth } = await import('../diagnostics');
+    const db = await openTestDb();
+    await seedIfEmpty(db, () => 'x');
+    const h = await sqliteHealth(db);
+    expect(h).toMatchObject({ ok: true, check: 'ok', schemaVersion: 5, quarantined: 0 });
+    expect(h.tables.find((t) => t.table === 'accounts')).toEqual({ table: 'accounts', total: 1, deleted: 0, pending: 1 });
+  });
+});

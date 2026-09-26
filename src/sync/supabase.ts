@@ -39,6 +39,18 @@ if (supabase && Platform.OS !== 'web') {
 
 export { createRemoteStore, fetchRemoteRow } from './remote';
 
+/** Testa se o Supabase responde (sem login, sem dado nenhum). */
+export async function pingSupabase(): Promise<{ ok: boolean; ms: number | null; status: number | null }> {
+  if (!cloudConfigured) return { ok: false, ms: null, status: null };
+  const t0 = Date.now();
+  try {
+    const res = await fetch(`${url}/auth/v1/health`, { headers: { apikey: key } });
+    return { ok: res.ok, ms: Date.now() - t0, status: res.status };
+  } catch {
+    return { ok: false, ms: null, status: null };
+  }
+}
+
 /**
  * Diferença entre o relógio do celular e o do Supabase (ms), pelo cabeçalho Date.
  * null quando não dá para medir (sem internet; na web o navegador esconde o cabeçalho).

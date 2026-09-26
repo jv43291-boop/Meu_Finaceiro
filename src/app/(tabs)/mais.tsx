@@ -58,6 +58,10 @@ export default function MoreScreen() {
       <Card>
         <ListRow icon="database-import-outline" title="Importar do app antigo" subtitle="Traz os lançamentos do backup do Meu Financeiro 1.0" onPress={() => router.push('/importar')} />
       </Card>
+      <Card>
+        <T variant="label">Avançado</T>
+        <ListRow icon="stethoscope" title="Diagnóstico" subtitle="Banco, conta, Supabase, sincronização e integridade" onPress={() => router.push('/diagnostico')} />
+      </Card>
       <T variant="caption" style={{ textAlign: 'center' }}>Live Finanças {Constants.expoConfig?.version ?? ''}</T>
     </Screen>
   );
