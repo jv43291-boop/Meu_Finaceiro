@@ -2,6 +2,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import Storage from 'expo-sqlite/kv-store';
 import { AppState, Platform } from 'react-native';
 
+import { offsetFromDateHeader } from './clock';
+
 
 /**
  * Credenciais vêm do arquivo .env (não versionado):
@@ -36,6 +38,22 @@ if (supabase && Platform.OS !== 'web') {
 }
 
 export { createRemoteStore } from './remote';
+
+/**
+ * Diferença entre o relógio do celular e o do Supabase (ms), pelo cabeçalho Date.
+ * null quando não dá para medir (sem internet; na web o navegador esconde o cabeçalho).
+ */
+export async function measureClockOffset(): Promise<number | null> {
+  if (!cloudConfigured) return null;
+  try {
+    const sent = Date.now();
+    const res = await fetch(`${url}/auth/v1/health`, { headers: { apikey: key } });
+    const received = Date.now();
+    return offsetFromDateHeader(res.headers.get('date'), sent, received);
+  } catch {
+    return null;
+  }
+}
 
 /** Backup do app antigo (tabela finance_backups), se existir para este usuário. */
 export async function fetchLegacyBackup(client: SupabaseClient): Promise<unknown | null> {

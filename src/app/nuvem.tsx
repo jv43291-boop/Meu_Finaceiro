@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useCloud } from '@/state/cloud';
+import { OFFSET_WARN_MS } from '@/sync/clock';
 import { useFinance } from '@/state/finance';
 import { Button, Card, Field, Icon, Input, Pill, Screen, Segmented, T } from '@/ui/components';
 import { confirmAsk, notify } from '@/ui/dialogs';
@@ -15,6 +16,15 @@ function since(iso: string | null): string {
   const h = Math.round(diff / 60);
   if (h < 24) return `sincronizado há ${h} h`;
   return `sincronizado em ${new Date(iso).toLocaleDateString('pt-BR')}`;
+}
+
+function skewLabel(ms: number): string {
+  const min = Math.round(Math.abs(ms) / 60_000);
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  const rest = min % 60;
+  if (h >= 48) return `${Math.round(h / 24)} dias`;
+  return rest ? `${h} h ${rest} min` : `${h} h`;
 }
 
 export default function CloudScreen() {
@@ -116,6 +126,18 @@ export default function CloudScreen() {
         <Button title="Sincronizar agora" icon="sync" variant="secondary" onPress={() => cloud.syncNow()} disabled={cloud.status === 'syncing'} />
         <T variant="caption">A sincronização também acontece sozinha: ao abrir o app, alguns segundos depois de cada alteração e a cada 5 minutos.</T>
       </Card>
+
+      {cloud.clockSkewMs !== null && Math.abs(cloud.clockSkewMs) >= OFFSET_WARN_MS ? (
+        <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+            <Icon name="clock-alert-outline" color={c.warning} />
+            <T variant="bodyStrong" color={c.warning}>Relógio do celular {cloud.clockSkewMs > 0 ? 'adiantado' : 'atrasado'} {skewLabel(cloud.clockSkewMs)}</T>
+          </View>
+          <T variant="caption">
+            A sincronização já corrige isso sozinha, mas “hoje”, atrasados, lembretes e a fatura aberta usam o relógio do celular. Ative “Data e hora automáticas” nas configurações do celular.
+          </T>
+        </Card>
+      ) : null}
 
       {cloud.legacyBackup ? (
         <Card>

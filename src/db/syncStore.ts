@@ -1,6 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { remoteWins, SYNC_TABLES, type LocalStore, type RemoteRow, type SyncTable } from '@/sync/engine';
+import { appClock } from '@/sync/clock';
 import { getMeta, setMeta } from './repo';
 
 /** Colunas sincronizadas de cada tabela (iguais no SQLite e no Supabase). */
@@ -76,6 +77,7 @@ export function createLocalStore(db: SQLiteDatabase): LocalStore {
       let changed = 0;
       await db.withTransactionAsync(async () => {
         for (const remote of rows) {
+          appClock.observe(remote.updated_at);
           const local = await db.getFirstAsync<{ updated_at: string }>(`SELECT updated_at FROM ${table} WHERE id = ?`, remote.id);
           if (!remoteWins(local, { updated_at: new Date(remote.updated_at).toISOString() })) continue;
           const values: Record<string, string | number | null> = {};
@@ -86,7 +88,7 @@ export function createLocalStore(db: SQLiteDatabase): LocalStore {
             incomingLoses = await resolveOccurrenceClash(db, String(loc.id), String(loc.recurrence_id), String(loc.occurrence_month), String(loc.updated_at));
           }
           if (incomingLoses) {
-            const now = new Date().toISOString();
+            const now = appClock.now();
             values.$occurrence_month = null;
             values.$deleted_at = (values.$deleted_at as string | null) ?? now;
             values.$updated_at = now;
@@ -116,7 +118,7 @@ async function resolveOccurrenceClash(db: SQLiteDatabase, id: string, recurrence
     recurrenceId, month, id,
   );
   if (!other) return false;
-  const now = new Date().toISOString();
+  const now = appClock.now();
   if (other.updated_at > updatedAt || (other.updated_at === updatedAt && other.id > id)) return true;
   await db.runAsync(
     'UPDATE transactions SET occurrence_month = NULL, deleted_at = COALESCE(deleted_at, ?), updated_at = ?, dirty = 1 WHERE id = ?',

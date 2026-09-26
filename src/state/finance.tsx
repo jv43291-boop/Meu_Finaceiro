@@ -5,6 +5,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { applyChanges, loadAll, seedIfEmpty, upsertAccount, upsertCard, upsertCategory, upsertGoal, upsertPayeeRule, type Snapshot } from '@/db/repo';
 import { invoiceFor } from '@/domain/cards';
 import { currentMonthKey, todayISO, type DateISO, type MonthKey } from '@/domain/dates';
+import { appClock } from '@/sync/clock';
 import { emitLocalChange } from './events';
 import { importLegacy, parseLegacy, type ImportResult } from '@/domain/legacyImport';
 import {
@@ -16,8 +17,16 @@ import type { Account, Category, CreditCard, Goal, ListItem, PayeeRule, Recurren
 
 export const ctx: Ctx = {
   newId: () => Crypto.randomUUID(),
-  now: () => new Date().toISOString(),
+  // relógio que nunca volta para trás e corrige pela hora do servidor (ver src/sync/clock.ts)
+  now: () => appClock.now(),
 };
+
+/** O relógio precisa saber a alteração mais recente que já existe no aparelho. */
+function observeAll(snap: Snapshot) {
+  for (const list of [snap.accounts, snap.categories, snap.recurrences, snap.transactions, snap.cards, snap.goals, snap.payeeRules]) {
+    for (const r of list) appClock.observe(r.updatedAt);
+  }
+}
 
 interface FinanceValue extends Snapshot {
   ready: boolean;
@@ -60,7 +69,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(() => currentMonthKey());
 
   const reload = useCallback(async () => {
-    setSnap(await loadAll(db));
+    const next = await loadAll(db);
+    observeAll(next);
+    setSnap(next);
   }, [db]);
 
   useEffect(() => {

@@ -6,7 +6,8 @@ import { AppState } from 'react-native';
 import { getMeta, seedIfEmpty, setMeta, wipeLocalData } from '@/db/repo';
 import { SYNC_USER_KEY, countDirty, createLocalStore, markAllDirty, resetSyncCursors } from '@/db/syncStore';
 import { syncOnce } from '@/sync/engine';
-import { cloudConfigured, createRemoteStore, fetchLegacyBackup, supabase } from '@/sync/supabase';
+import { appClock } from '@/sync/clock';
+import { cloudConfigured, createRemoteStore, fetchLegacyBackup, measureClockOffset, supabase } from '@/sync/supabase';
 import { onLocalChange } from './events';
 import { ctx, useFinance } from './finance';
 
@@ -21,6 +22,8 @@ interface CloudValue {
   lastError: string | null;
   /** backup do Meu Financeiro 1.0 encontrado na conta, ainda não importado */
   legacyBackup: unknown | null;
+  /** relógio do celular − hora real (ms); positivo = adiantado. null = ainda não medido */
+  clockSkewMs: number | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   /**
@@ -38,6 +41,7 @@ const CloudContext = createContext<CloudValue | null>(null);
 const LOCAL_CHANGE_DEBOUNCE_MS = 3_000;
 const PERIODIC_MS = 5 * 60_000;
 const legacyKey = (uid: string) => `legacy_checked:${uid}`;
+const CLOCK_KEY = 'clock_offset_ms';
 
 function friendly(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
@@ -64,12 +68,23 @@ export function CloudProvider({ children }: { children: ReactNode }) {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const [legacyBackup, setLegacyBackup] = useState<unknown | null>(null);
+  const [clockSkewMs, setClockSkewMs] = useState<number | null>(null);
   const running = useRef(false);
   const again = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getMeta(db, 'last_sync_at').then(setLastSyncAt).catch(() => undefined);
+    // última diferença de relógio medida: já corrige as marcas antes do primeiro sync
+    getMeta(db, CLOCK_KEY)
+      .then((v) => {
+        const ms = v === null ? NaN : Number(v);
+        if (Number.isFinite(ms)) {
+          appClock.setOffset(ms);
+          setClockSkewMs(-ms);
+        }
+      })
+      .catch(() => undefined);
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
@@ -85,6 +100,12 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     running.current = true;
     setStatus('syncing');
     try {
+      const offset = await measureClockOffset();
+      if (offset !== null) {
+        appClock.setOffset(offset);
+        setClockSkewMs(-offset);
+        await setMeta(db, CLOCK_KEY, String(Math.round(offset)));
+      }
       do {
         again.current = false;
         const result = await syncOnce(createLocalStore(db), createRemoteStore(supabase, session.user.id));
@@ -173,6 +194,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
       lastSyncAt,
       lastError,
       legacyBackup,
+      clockSkewMs,
       async signIn(email, password) {
         if (!supabase) throw new Error('Nuvem não configurada.');
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -208,7 +230,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
         setLegacyBackup(null);
       },
     }),
-    [session, status, lastSyncAt, lastError, legacyBackup, syncNow, db, reload],
+    [session, status, lastSyncAt, lastError, legacyBackup, clockSkewMs, syncNow, db, reload],
   );
 
   return <CloudContext.Provider value={value}>{children}</CloudContext.Provider>;
