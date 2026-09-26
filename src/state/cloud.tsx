@@ -3,8 +3,9 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
-import { getMeta, seedIfEmpty, setMeta, wipeLocalData } from '@/db/repo';
-import { SYNC_USER_KEY, countDirty, createLocalStore, discardLocal, listRejected, markAllDirty, resetSyncCursors, retryRejected, type RejectedItem } from '@/db/syncStore';
+import { getMeta, setMeta } from '@/db/repo';
+import { countDirty, createLocalStore, discardLocal, listRejected, retryRejected, type RejectedItem } from '@/db/syncStore';
+import { clearDeviceAfterSignOut, prepareDeviceForUser } from '@/sync/account';
 import { SyncError, syncOnce } from '@/sync/engine';
 import { appClock } from '@/sync/clock';
 import { cloudConfigured, createRemoteStore, fetchLegacyBackup, fetchRemoteRow, measureClockOffset, supabase } from '@/sync/supabase';
@@ -192,20 +193,8 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     if (!supabase || !uid) return;
     let cancelled = false;
     (async () => {
-      const owner = await getMeta(db, SYNC_USER_KEY);
-      if (owner && owner !== uid) {
-        // o aparelho tem dados de OUTRA conta (ex.: versão antiga não apagava ao sair):
-        // nunca misturar — apaga daqui e baixa os da conta que entrou
-        await wipeLocalData(db);
-        await seedIfEmpty(db, ctx.newId);
-        await setMeta(db, SYNC_USER_KEY, uid);
-        await reload();
-      } else if (!owner) {
-        // dados criados sem conta: sobem para a conta na primeira entrada
-        await resetSyncCursors(db);
-        await markAllDirty(db);
-        await setMeta(db, SYNC_USER_KEY, uid);
-      }
+      const action = await prepareDeviceForUser(db, uid, ctx.newId);
+      if (action === 'wipe-other') await reload();
       if (cancelled) return;
       await syncNow();
       if ((await getMeta(db, legacyKey(uid))) !== '1') {
@@ -292,8 +281,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
         await supabase.auth.signOut();
         setLegacyBackup(null);
         // os dados eram desta conta: não ficam no aparelho para a próxima pessoa
-        await wipeLocalData(db);
-        await seedIfEmpty(db, ctx.newId);
+        await clearDeviceAfterSignOut(db, ctx.newId);
         await reload();
         setLastSyncAt(null);
         setLastError(null);
