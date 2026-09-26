@@ -144,6 +144,18 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_payee_rules_name ON payee_rules (match_name);
   `,
+  // 5: fila de sincronização — registros que o servidor recusou ficam de lado (só no aparelho)
+  `
+  CREATE TABLE sync_quarantine (
+    tbl TEXT NOT NULL,
+    id TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 1,
+    last_error TEXT NOT NULL,
+    next_try_at TEXT NOT NULL,
+    PRIMARY KEY (tbl, id)
+  );
+  `,
 ];
 
 export async function migrateDbIfNeeded(db: SQLiteDatabase): Promise<void> {

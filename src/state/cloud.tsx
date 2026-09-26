@@ -4,14 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 
 import { getMeta, seedIfEmpty, setMeta, wipeLocalData } from '@/db/repo';
-import { SYNC_USER_KEY, countDirty, createLocalStore, markAllDirty, resetSyncCursors } from '@/db/syncStore';
-import { syncOnce } from '@/sync/engine';
+import { SYNC_USER_KEY, countDirty, createLocalStore, discardLocal, listRejected, markAllDirty, resetSyncCursors, retryRejected, type RejectedItem } from '@/db/syncStore';
+import { SyncError, syncOnce } from '@/sync/engine';
 import { appClock } from '@/sync/clock';
-import { cloudConfigured, createRemoteStore, fetchLegacyBackup, measureClockOffset, supabase } from '@/sync/supabase';
+import { cloudConfigured, createRemoteStore, fetchLegacyBackup, fetchRemoteRow, measureClockOffset, supabase } from '@/sync/supabase';
 import { onLocalChange } from './events';
 import { ctx, useFinance } from './finance';
 
-export type SyncStatus = 'off' | 'idle' | 'syncing' | 'error';
+export type SyncStatus = 'off' | 'idle' | 'syncing' | 'offline' | 'error';
 
 interface CloudValue {
   configured: boolean;
@@ -24,6 +24,15 @@ interface CloudValue {
   legacyBackup: unknown | null;
   /** relógio do celular − hora real (ms); positivo = adiantado. null = ainda não medido */
   clockSkewMs: number | null;
+  /** alterações deste celular ainda não enviadas (inclui as recusadas) */
+  pending: number;
+  /** registros que o servidor recusou; ficam de lado para não travar o resto */
+  rejected: RejectedItem[];
+  /** próxima tentativa automática depois de uma falha (ISO), ou null */
+  nextRetryAt: string | null;
+  retryRejected: (item: RejectedItem) => Promise<void>;
+  /** joga fora a alteração local e fica com a versão da nuvem */
+  discardRejected: (item: RejectedItem) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
   /**
@@ -41,6 +50,8 @@ const CloudContext = createContext<CloudValue | null>(null);
 const LOCAL_CHANGE_DEBOUNCE_MS = 3_000;
 const PERIODIC_MS = 5 * 60_000;
 const legacyKey = (uid: string) => `legacy_checked:${uid}`;
+/** depois de uma falha, tenta de novo em 30 s, 1, 2, 5, 10, 20 e depois a cada 30 min */
+const RETRY_DELAYS_MS = [30_000, 60_000, 120_000, 300_000, 600_000, 1_200_000, 1_800_000];
 const CLOCK_KEY = 'clock_offset_ms';
 
 function friendly(e: unknown): string {
@@ -69,6 +80,12 @@ export function CloudProvider({ children }: { children: ReactNode }) {
   const [lastError, setLastError] = useState<string | null>(null);
   const [legacyBackup, setLegacyBackup] = useState<unknown | null>(null);
   const [clockSkewMs, setClockSkewMs] = useState<number | null>(null);
+  const [pending, setPending] = useState(0);
+  const [rejected, setRejected] = useState<RejectedItem[]>([]);
+  const [nextRetryAt, setNextRetryAt] = useState<string | null>(null);
+  const failures = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncRef = useRef<() => Promise<void>>(async () => undefined);
   const running = useRef(false);
   const again = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,6 +107,29 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     const { data } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
     return () => data.subscription.unsubscribe();
   }, [db]);
+
+  const refreshQueue = useCallback(async () => {
+    try {
+      setPending(await countDirty(db));
+      setRejected(await listRejected(db));
+    } catch {
+      // só informativo
+    }
+  }, [db]);
+
+  const scheduleRetry = useCallback((ok: boolean) => {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    retryTimer.current = null;
+    if (ok) {
+      failures.current = 0;
+      setNextRetryAt(null);
+      return;
+    }
+    const delay = RETRY_DELAYS_MS[Math.min(failures.current, RETRY_DELAYS_MS.length - 1)];
+    failures.current++;
+    setNextRetryAt(new Date(Date.now() + delay).toISOString());
+    retryTimer.current = setTimeout(() => void syncRef.current(), delay);
+  }, []);
 
   const syncNow = useCallback(async () => {
     if (!supabase || !session) return;
@@ -116,13 +156,35 @@ export function CloudProvider({ children }: { children: ReactNode }) {
       setLastSyncAt(now);
       setLastError(null);
       setStatus('idle');
+      scheduleRetry(true);
     } catch (e) {
-      setLastError(friendly(e));
-      setStatus('error');
+      const offline = (e instanceof SyncError && e.kind === 'network') || /Network request failed|Failed to fetch|fetch failed/i.test(String(e));
+      setLastError(offline ? null : friendly(e));
+      setStatus(offline ? 'offline' : 'error');
+      scheduleRetry(false);
     } finally {
       running.current = false;
+      await refreshQueue();
     }
-  }, [db, session, reload]);
+  }, [db, session, reload, refreshQueue, scheduleRetry]);
+
+  useEffect(() => {
+    syncRef.current = syncNow;
+  }, [syncNow]);
+
+  // contador de pendências atualizado a cada alteração local
+  useEffect(() => {
+    const first = setTimeout(() => void refreshQueue(), 0);
+    const off = onLocalChange(() => void refreshQueue());
+    return () => {
+      clearTimeout(first);
+      off();
+    };
+  }, [refreshQueue]);
+
+  useEffect(() => () => {
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+  }, []);
 
   // ao entrar numa conta: prepara o aparelho e procura o backup do app antigo
   useEffect(() => {
@@ -195,6 +257,20 @@ export function CloudProvider({ children }: { children: ReactNode }) {
       lastError,
       legacyBackup,
       clockSkewMs,
+      pending,
+      rejected,
+      nextRetryAt,
+      async retryRejected(item) {
+        await retryRejected(db, item.table, item.id);
+        await syncNow();
+      },
+      async discardRejected(item) {
+        if (!supabase) return;
+        const server = await fetchRemoteRow(supabase, item.table, item.id);
+        await discardLocal(db, item.table, item.id, server);
+        await reload();
+        await refreshQueue();
+      },
       async signIn(email, password) {
         if (!supabase) throw new Error('Nuvem não configurada.');
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
@@ -221,6 +297,8 @@ export function CloudProvider({ children }: { children: ReactNode }) {
         await reload();
         setLastSyncAt(null);
         setLastError(null);
+        scheduleRetry(true);
+        await refreshQueue();
         return { done: true };
       },
       syncNow,
@@ -230,7 +308,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
         setLegacyBackup(null);
       },
     }),
-    [session, status, lastSyncAt, lastError, legacyBackup, clockSkewMs, syncNow, db, reload],
+    [session, status, lastSyncAt, lastError, legacyBackup, clockSkewMs, pending, rejected, nextRetryAt, syncNow, db, reload, refreshQueue, scheduleRetry],
   );
 
   return <CloudContext.Provider value={value}>{children}</CloudContext.Provider>;

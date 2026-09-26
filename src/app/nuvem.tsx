@@ -18,6 +18,90 @@ function since(iso: string | null): string {
   return `sincronizado em ${new Date(iso).toLocaleDateString('pt-BR')}`;
 }
 
+function timeUntil(iso: string): string {
+  const s = Math.max(0, Math.round((Date.parse(iso) - Date.now()) / 1000));
+  if (s < 60) return `${s} s`;
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} min` : `${Math.round(m / 60)} h`;
+}
+
+/** Quantas alterações esperam envio e quando é a próxima tentativa. */
+function Pending() {
+  const cloud = useCloud();
+  const c = useColors();
+  const waiting = cloud.pending - cloud.rejected.length;
+  if (cloud.pending === 0) return <T variant="caption">Tudo enviado para a nuvem.</T>;
+  return (
+    <View style={{ gap: 2 }}>
+      <T variant="bodyStrong" color={c.text}>
+        {waiting > 0 ? (waiting === 1 ? '1 alteração aguardando envio' : `${waiting} alterações aguardando envio`) : 'Nada aguardando além das recusadas'}
+      </T>
+      {cloud.nextRetryAt && cloud.status !== 'syncing' ? <T variant="caption">Próxima tentativa automática em {timeUntil(cloud.nextRetryAt)}.</T> : null}
+    </View>
+  );
+}
+
+const TABLE_LABEL: Record<string, string> = {
+  accounts: 'Conta', categories: 'Categoria', credit_cards: 'Cartão', goals: 'Meta',
+  payee_rules: 'Regra de recebedor', recurrences: 'Fixo', transactions: 'Lançamento',
+};
+
+function rejectionReason(error: string): string {
+  if (/check constraint|too long|out of range/i.test(error)) return 'Algum campo está fora do limite aceito (por exemplo, um texto longo demais).';
+  if (/row-level security/i.test(error)) return 'O servidor não reconheceu este registro como seu.';
+  if (/invalid input|not-null|null value/i.test(error)) return 'Algum campo está vazio ou num formato que o servidor não aceita.';
+  return error.replace(/^Falha ao enviar \w+: /, '');
+}
+
+/** Registros que o servidor recusou: não travam o resto, mas precisam de uma decisão. */
+function RejectedPanel() {
+  const cloud = useCloud();
+  const c = useColors();
+  const [busy, setBusy] = useState<string | null>(null);
+  async function act(item: (typeof cloud.rejected)[number], kind: 'retry' | 'discard') {
+    if (kind === 'discard') {
+      const ok = await confirmAsk(
+        'Descartar sua alteração?',
+        `“${item.label}” volta a ficar como está na nuvem. Se ele nunca chegou à nuvem, é apagado deste celular.`,
+        'Descartar',
+        true,
+      );
+      if (!ok) return;
+    }
+    setBusy(item.id);
+    try {
+      if (kind === 'retry') await cloud.retryRejected(item);
+      else await cloud.discardRejected(item);
+    } catch (e) {
+      await notify('Não deu certo', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+        <Icon name="alert-circle-outline" color={c.warning} />
+        <T variant="bodyStrong" color={c.warning}>
+          {cloud.rejected.length === 1 ? '1 item recusado pelo servidor' : `${cloud.rejected.length} itens recusados pelo servidor`}
+        </T>
+      </View>
+      <T variant="caption">O resto continua sincronizando normalmente. Estes ficam só neste celular até serem resolvidos.</T>
+      {cloud.rejected.map((item) => (
+        <View key={`${item.table}:${item.id}`} style={{ gap: 6, paddingTop: space.sm, borderTopWidth: 1, borderTopColor: c.border }}>
+          <T variant="bodyStrong">{TABLE_LABEL[item.table] ?? item.table}: {item.label}</T>
+          <T variant="caption">{rejectionReason(item.error)}</T>
+          <T variant="caption">Tentativas: {item.attempts} · próxima sozinha em {timeUntil(item.nextTryAt)}</T>
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
+            <Button title="Tentar de novo" icon="refresh" variant="secondary" onPress={() => act(item, 'retry')} disabled={busy === item.id} style={{ flex: 1 }} />
+            <Button title="Descartar" icon="undo-variant" variant="danger" onPress={() => act(item, 'discard')} disabled={busy === item.id} style={{ flex: 1 }} />
+          </View>
+        </View>
+      ))}
+    </Card>
+  );
+}
+
 function skewLabel(ms: number): string {
   const min = Math.round(Math.abs(ms) / 60_000);
   if (min < 60) return `${min} min`;
@@ -108,14 +192,18 @@ export default function CloudScreen() {
     );
   }
 
-  const statusLabel = cloud.status === 'syncing' ? 'sincronizando…' : cloud.status === 'error' ? 'erro na última tentativa' : since(cloud.lastSyncAt);
+  const statusLabel =
+    cloud.status === 'syncing' ? 'sincronizando…'
+      : cloud.status === 'offline' ? 'sem internet — tenta de novo sozinho'
+        : cloud.status === 'error' ? 'erro na última tentativa'
+          : since(cloud.lastSyncAt);
 
   return (
     <Screen>
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
           <View style={{ width: 44, height: 44, borderRadius: 16, backgroundColor: c.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
-            {cloud.status === 'syncing' ? <ActivityIndicator color={c.primaryText} /> : <Icon name={cloud.status === 'error' ? 'cloud-alert-outline' : 'cloud-check-outline'} color={cloud.status === 'error' ? c.warning : c.primaryText} />}
+            {cloud.status === 'syncing' ? <ActivityIndicator color={c.primaryText} /> : <Icon name={cloud.status === 'error' ? 'cloud-alert-outline' : cloud.status === 'offline' ? 'cloud-off-outline' : 'cloud-check-outline'} color={cloud.status === 'error' || cloud.status === 'offline' ? c.warning : c.primaryText} />}
           </View>
           <View style={{ flex: 1, gap: 2 }}>
             <T variant="bodyStrong" numberOfLines={1}>{cloud.email}</T>
@@ -123,9 +211,12 @@ export default function CloudScreen() {
           </View>
         </View>
         {cloud.lastError ? <T variant="caption" color={c.warning}>{cloud.lastError}</T> : null}
+        <Pending />
         <Button title="Sincronizar agora" icon="sync" variant="secondary" onPress={() => cloud.syncNow()} disabled={cloud.status === 'syncing'} />
         <T variant="caption">A sincronização também acontece sozinha: ao abrir o app, alguns segundos depois de cada alteração e a cada 5 minutos.</T>
       </Card>
+
+      {cloud.rejected.length > 0 ? <RejectedPanel /> : null}
 
       {cloud.clockSkewMs !== null && Math.abs(cloud.clockSkewMs) >= OFFSET_WARN_MS ? (
         <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>

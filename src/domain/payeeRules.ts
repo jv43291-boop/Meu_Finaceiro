@@ -30,7 +30,8 @@ export function upsertPayeeRule(
   input: { name: string; doc: string | null; description: string; categoryId: string | null; accountId: string | null },
   ctx: { newId: () => string; now: () => string },
 ): PayeeRule {
-  const matchName = normalizeName(input.name);
+  // mesmos limites do servidor (migração 20260928000000_live_pix.sql)
+  const matchName = normalizeName(input.name).slice(0, 200);
   const existing = rules.find((r) => !r.deletedAt && r.matchName === matchName && r.matchDoc === (input.doc ?? null));
   const now = ctx.now();
   return {
@@ -39,8 +40,8 @@ export function upsertPayeeRule(
     updatedAt: now,
     deletedAt: null,
     matchName,
-    matchDoc: input.doc ?? null,
-    description: input.description.trim(),
+    matchDoc: input.doc && /^[0-9]{2,14}$/.test(input.doc) ? input.doc : null,
+    description: input.description.trim().slice(0, 200),
     categoryId: input.categoryId,
     accountId: input.accountId,
   };

@@ -24,6 +24,23 @@ export interface LocalStore {
   applyRemote(table: SyncTable, rows: RemoteRow[]): Promise<number>;
   getCursor(table: SyncTable): Promise<string | null>;
   setCursor(table: SyncTable, cursor: string): Promise<void>;
+  /**
+   * Separa registros que o servidor recusou, para não travarem o resto.
+   * dirty() deixa de devolvê-los até a próxima tentativa ou até o registro mudar.
+   */
+  quarantine?(table: SyncTable, rows: { id: string; updated_at: string }[], error: string): Promise<void>;
+  /** tira da quarentena os que finalmente subiram */
+  release?(table: SyncTable, ids: string[]): Promise<void>;
+}
+
+/** Por que uma chamada ao servidor falhou. */
+export type SyncErrorKind = 'network' | 'auth' | 'rejected' | 'unknown';
+
+export class SyncError extends Error {
+  constructor(message: string, public kind: SyncErrorKind) {
+    super(message);
+    this.name = 'SyncError';
+  }
 }
 
 export interface RemoteStore {
@@ -34,6 +51,8 @@ export interface RemoteStore {
 
 export interface SyncResult {
   pushed: number;
+  /** registros recusados pelo servidor nesta rodada (foram para a quarentena) */
+  rejected: number;
   pulled: number;
   /** registros locais que mudaram por causa do pull (telas precisam recarregar) */
   changedLocally: number;
@@ -61,17 +80,44 @@ export function remoteWins(local: { updated_at: string } | null | undefined, rem
   return Date.parse(remote.updated_at) > Date.parse(local.updated_at);
 }
 
+/**
+ * Envia um lote. Se o servidor recusar (dado inválido, não falta de internet),
+ * divide o lote ao meio até achar o(s) registro(s) culpado(s): esses vão para a
+ * quarentena e o resto sobe normalmente. Sem internet ou sessão vencida: desiste
+ * da rodada inteira (nada é marcado como enviado).
+ */
+async function pushIsolating(local: LocalStore, remote: RemoteStore, table: SyncTable, rows: RemoteRow[]): Promise<{ pushed: number; rejected: number }> {
+  try {
+    await remote.upsert(table, rows);
+  } catch (e) {
+    const rejectedByServer = e instanceof SyncError && e.kind === 'rejected';
+    if (!rejectedByServer || !local.quarantine) throw e;
+    if (rows.length === 1) {
+      await local.quarantine(table, [{ id: rows[0].id, updated_at: rows[0].updated_at }], e.message);
+      return { pushed: 0, rejected: 1 };
+    }
+    const mid = Math.ceil(rows.length / 2);
+    const a = await pushIsolating(local, remote, table, rows.slice(0, mid));
+    const b = await pushIsolating(local, remote, table, rows.slice(mid));
+    return { pushed: a.pushed + b.pushed, rejected: a.rejected + b.rejected };
+  }
+  const sent = rows.map((r) => ({ id: r.id, updated_at: r.updated_at }));
+  await local.markClean(table, sent);
+  await local.release?.(table, sent.map((r) => r.id));
+  return { pushed: rows.length, rejected: 0 };
+}
+
 export async function syncOnce(local: LocalStore, remote: RemoteStore): Promise<SyncResult> {
-  const result: SyncResult = { pushed: 0, pulled: 0, changedLocally: 0 };
+  const result: SyncResult = { pushed: 0, rejected: 0, pulled: 0, changedLocally: 0 };
 
   // regras e contas antes dos lançamentos que apontam para elas
   for (const table of SYNC_TABLES) {
     for (;;) {
       const rows = await local.dirty(table, BATCH);
       if (!rows.length) break;
-      await remote.upsert(table, rows);
-      await local.markClean(table, rows.map((r) => ({ id: r.id, updated_at: r.updated_at })));
-      result.pushed += rows.length;
+      const { pushed, rejected } = await pushIsolating(local, remote, table, rows);
+      result.pushed += pushed;
+      result.rejected += rejected;
       if (rows.length < BATCH) break;
     }
   }

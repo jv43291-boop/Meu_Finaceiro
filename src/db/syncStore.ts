@@ -55,8 +55,38 @@ const cursorKey = (t: SyncTable) => `sync_cursor:${t}`;
 export function createLocalStore(db: SQLiteDatabase): LocalStore {
   return {
     async dirty(table, limit) {
-      const rows = await db.getAllAsync<Row>(`SELECT * FROM ${table} WHERE dirty = 1 ORDER BY updated_at LIMIT ?`, limit);
+      // fora os recusados que ainda estão esperando a vez; se o registro mudou depois
+      // da recusa (updated_at diferente), tenta de novo na hora
+      const rows = await db.getAllAsync<Row>(
+        `SELECT t.* FROM ${table} t
+          WHERE t.dirty = 1
+            AND NOT EXISTS (SELECT 1 FROM sync_quarantine q
+                             WHERE q.tbl = ? AND q.id = t.id AND q.updated_at = t.updated_at AND q.next_try_at > ?)
+          ORDER BY t.updated_at LIMIT ?`,
+        table, new Date().toISOString(), limit,
+      );
       return rows.map((r) => toRemote(table, r));
+    },
+
+    async quarantine(table, rows, error) {
+      await db.withTransactionAsync(async () => {
+        for (const r of rows) {
+          const prev = await db.getFirstAsync<{ attempts: number }>('SELECT attempts FROM sync_quarantine WHERE tbl = ? AND id = ?', table, r.id);
+          const attempts = (prev?.attempts ?? 0) + 1;
+          await db.runAsync(
+            `INSERT INTO sync_quarantine (tbl, id, updated_at, attempts, last_error, next_try_at) VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(tbl, id) DO UPDATE SET updated_at = excluded.updated_at, attempts = excluded.attempts,
+               last_error = excluded.last_error, next_try_at = excluded.next_try_at`,
+            table, r.id, r.updated_at, attempts, error.slice(0, 500), new Date(Date.now() + quarantineDelay(attempts)).toISOString(),
+          );
+        }
+      });
+    },
+
+    async release(table, ids) {
+      if (!ids.length) return;
+      const marks = ids.map(() => '?').join(',');
+      await db.runAsync(`DELETE FROM sync_quarantine WHERE tbl = ? AND id IN (${marks})`, table, ...ids);
     },
 
     async markClean(table, rows) {
@@ -151,4 +181,75 @@ export async function countDirty(db: SQLiteDatabase): Promise<number> {
     n += r?.n ?? 0;
   }
   return n;
+}
+
+/** Recusado de novo: espera cada vez mais (5 min, 15 min, 1 h, depois 6 h). */
+export function quarantineDelay(attempts: number): number {
+  const min = 60_000;
+  return [5 * min, 15 * min, 60 * min][attempts - 1] ?? 6 * 60 * min;
+}
+
+export interface RejectedItem {
+  table: SyncTable;
+  id: string;
+  /** descrição/nome do registro, para a pessoa reconhecer */
+  label: string;
+  error: string;
+  attempts: number;
+  nextTryAt: string;
+}
+
+const LABEL_COLUMN: Record<SyncTable, string> = {
+  accounts: 'name', categories: 'name', credit_cards: 'name', goals: 'name',
+  payee_rules: 'description', recurrences: 'description', transactions: 'description',
+};
+
+/** Registros recusados pelo servidor que ainda estão pendentes. */
+export async function listRejected(db: SQLiteDatabase): Promise<RejectedItem[]> {
+  const q = await db.getAllAsync<{ tbl: SyncTable; id: string; updated_at: string; attempts: number; last_error: string; next_try_at: string }>(
+    'SELECT * FROM sync_quarantine ORDER BY next_try_at',
+  );
+  const out: RejectedItem[] = [];
+  for (const r of q) {
+    if (!SYNC_TABLES.includes(r.tbl)) continue;
+    const row = await db.getFirstAsync<{ label: string | null; dirty: number; updated_at: string }>(
+      `SELECT ${LABEL_COLUMN[r.tbl]} AS label, dirty, updated_at FROM ${r.tbl} WHERE id = ?`, r.id,
+    );
+    // já subiu ou foi apagado/alterado depois: a quarentena antiga não vale mais
+    if (!row || row.dirty !== 1) {
+      await db.runAsync('DELETE FROM sync_quarantine WHERE tbl = ? AND id = ?', r.tbl, r.id);
+      continue;
+    }
+    out.push({ table: r.tbl, id: r.id, label: row.label || '(sem nome)', error: r.last_error, attempts: r.attempts, nextTryAt: r.next_try_at });
+  }
+  return out;
+}
+
+/** "Tentar de novo": libera o registro para a próxima sincronização. */
+export async function retryRejected(db: SQLiteDatabase, table: SyncTable, id: string) {
+  await db.runAsync('UPDATE sync_quarantine SET next_try_at = ? WHERE tbl = ? AND id = ?', new Date(0).toISOString(), table, id);
+}
+
+/**
+ * "Descartar minha alteração": volta para a versão da nuvem (ou, se o registro
+ * nunca chegou lá, apaga do aparelho).
+ */
+export async function discardLocal(db: SQLiteDatabase, table: SyncTable, id: string, serverRow: RemoteRow | null) {
+  await db.withTransactionAsync(async () => {
+    if (serverRow) {
+      const cols = COLUMNS[table];
+      appClock.observe(serverRow.updated_at);
+      const loc = toLocal(table, serverRow);
+      const values: Record<string, string | number | null> = {};
+      for (const c of cols) values[`$${c}`] = loc[c] as string | number | null;
+      await db.runAsync(
+        `INSERT INTO ${table} (${cols.join(', ')}, dirty) VALUES (${cols.map((c) => `$${c}`).join(', ')}, 0)
+         ON CONFLICT(id) DO UPDATE SET ${cols.filter((c) => c !== 'id').map((c) => `${c} = $${c}`).join(', ')}, dirty = 0`,
+        values,
+      );
+    } else {
+      await db.runAsync(`DELETE FROM ${table} WHERE id = ?`, id);
+    }
+    await db.runAsync('DELETE FROM sync_quarantine WHERE tbl = ? AND id = ?', table, id);
+  });
 }

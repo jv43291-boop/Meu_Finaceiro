@@ -205,7 +205,7 @@ export default function ReceiptScreen() {
           </Field>
 
           <Field label="Descrição" hint={name ? `Troque o nome da pessoa pelo que foi o gasto. Ex.: ${type === 'income' ? 'Venda do bolo' : 'Compra de pão'}` : undefined}>
-            <Input value={description} onChangeText={setDescription} placeholder="Ex.: Compra de pão" />
+            <Input value={description} onChangeText={setDescription} placeholder="Ex.: Compra de pão" maxLength={200} />
           </Field>
 
           <Field label="Categoria">

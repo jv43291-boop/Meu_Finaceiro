@@ -44,7 +44,7 @@ export default function PayeeRulesScreen() {
           {editing.matchDoc ? <T variant="caption">Documento com os dígitos {editing.matchDoc}</T> : <T variant="caption">Vale para qualquer documento com esse nome</T>}
         </Card>
         <Field label="Vira a descrição">
-          <Input value={description} onChangeText={setDescription} placeholder="Ex.: Compra de pão" />
+          <Input value={description} onChangeText={setDescription} placeholder="Ex.: Compra de pão" maxLength={200} />
         </Field>
         <Field label="Categoria">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>

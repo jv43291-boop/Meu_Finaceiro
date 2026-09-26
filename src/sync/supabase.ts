@@ -37,7 +37,7 @@ if (supabase && Platform.OS !== 'web') {
   });
 }
 
-export { createRemoteStore } from './remote';
+export { createRemoteStore, fetchRemoteRow } from './remote';
 
 /**
  * Diferença entre o relógio do celular e o do Supabase (ms), pelo cabeçalho Date.

@@ -4,7 +4,18 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import type { RemoteRow, RemoteStore, SyncTable } from './engine';
+import { SyncError, type RemoteRow, type RemoteStore, type SyncErrorKind, type SyncTable } from './engine';
+
+/** Erro do Supabase/PostgREST → tipo de falha. */
+export function classify(error: { message?: string; code?: string; status?: number }): SyncErrorKind {
+  const msg = error.message ?? '';
+  const code = error.code ?? '';
+  if (/fetch failed|network request failed|failed to fetch|networkerror|timeout|aborted|load failed/i.test(msg) || error.status === 0) return 'network';
+  if (code === 'PGRST301' || code === 'PGRST303' || /jwt|expired|invalid token|not authenticated/i.test(msg) || error.status === 401) return 'auth';
+  // dado que o banco não aceita: regra (check), tipo, tamanho, obrigatório, permissão da linha
+  if (/^(22|23)/.test(code) || code === '42501' || code === 'PGRST204' || /violates|invalid input|too long|out of range/i.test(msg)) return 'rejected';
+  return 'unknown';
+}
 
 /**
  * Chave de conflito no servidor. Depois da migração 20260929000000_live_isolamento
@@ -24,14 +35,21 @@ export function createRemoteStore(client: SupabaseClient, userId: string): Remot
         conflictKey = conflictKey === 'user_id,id' ? 'id' : 'user_id,id';
         ({ error } = await client.from(table).upsert(owned, { onConflict: conflictKey }));
       }
-      if (error) throw new Error(`Falha ao enviar ${table}: ${error.message}`);
+      if (error) throw new SyncError(`Falha ao enviar ${table}: ${error.message}`, classify(error));
     },
     async pullSince(table: SyncTable, since: string | null, limit: number) {
       let q = client.from(table).select('*').order('server_updated_at', { ascending: true }).order('id').limit(limit);
       if (since) q = q.gt('server_updated_at', since);
       const { data, error } = await q;
-      if (error) throw new Error(`Falha ao baixar ${table}: ${error.message}`);
+      if (error) throw new SyncError(`Falha ao baixar ${table}: ${error.message}`, classify(error));
       return (data ?? []) as RemoteRow[];
     },
   };
+}
+
+/** Versão do servidor de um registro (para "Descartar minha alteração"). */
+export async function fetchRemoteRow(client: SupabaseClient, table: SyncTable, id: string): Promise<RemoteRow | null> {
+  const { data, error } = await client.from(table).select('*').eq('id', id).maybeSingle();
+  if (error) throw new SyncError(`Falha ao buscar ${table}: ${error.message}`, classify(error));
+  return (data as RemoteRow | null) ?? null;
 }

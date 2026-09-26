@@ -22,14 +22,16 @@ export default function MoreScreen() {
     ? 'Nuvem não configurada'
     : !cloud.session
       ? 'Entre para guardar seus dados na nuvem'
-      : cloud.status === 'error'
-        ? 'Erro ao sincronizar — toque para ver'
-        : cloud.email ?? 'Conectado';
+      : cloud.status === 'error' || cloud.rejected.length > 0
+        ? 'Precisa de atenção — toque para ver'
+        : cloud.status === 'offline'
+          ? `Sem internet · ${cloud.pending} aguardando envio`
+          : cloud.email ?? 'Conectado';
   return (
     <Screen>
       <T variant="title">Mais</T>
       <Card>
-        <ListRow icon={cloud.status === 'error' ? 'cloud-alert-outline' : 'cloud-sync-outline'} title="Conta e sincronização" subtitle={cloudSubtitle} onPress={() => router.push('/nuvem')} />
+        <ListRow icon={cloud.status === 'error' || cloud.rejected.length > 0 ? 'cloud-alert-outline' : cloud.status === 'offline' ? 'cloud-off-outline' : 'cloud-sync-outline'} title="Conta e sincronização" subtitle={cloudSubtitle} onPress={() => router.push('/nuvem')} />
       </Card>
       <Card>
         <ListRow icon="receipt-text-outline" title="Lançar comprovante de Pix" subtitle="Lê o print ou PDF e desconta do saldo" onPress={() => router.push('/comprovante')} />

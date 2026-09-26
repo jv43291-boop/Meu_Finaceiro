@@ -232,6 +232,7 @@ const DATA_TABLES = ['transactions', 'recurrences', 'payee_rules', 'goals', 'cre
 export async function wipeLocalData(db: SQLiteDatabase) {
   await db.withTransactionAsync(async () => {
     for (const t of DATA_TABLES) await db.runAsync(`DELETE FROM ${t}`);
+    await db.runAsync('DELETE FROM sync_quarantine');
     await db.runAsync(
       "DELETE FROM meta WHERE key LIKE 'sync_cursor:%' OR key LIKE 'legacy_checked:%' OR key IN ('sync_user_id', 'last_sync_at')",
     );
