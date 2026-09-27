@@ -1,0 +1,11 @@
+Carlos Teste Exemplo
+01 DE SETEMBRO DE 2026 a 30 DE SETEMBRO DE 2026
+Movimentações
+02 SET 2026   Total de entradas   + 150,00
+Transferência recebida pelo Pix   ANA EXEMPLO - •••.111.222-•• - BANCO EXEMPLO   150,00
+Total de saídas   - 45,90
+Transferência enviada pelo Pix   MERCADO EXEMPLO - 00.000.000/0001-00 - BANCO EXEMPLO   45,90
+05 SET 2026   Total de saídas   - 99,90
+Compra no débito
+LOJA FICTICIA   99,90
+Saldo final do período   R$ 1.104,20

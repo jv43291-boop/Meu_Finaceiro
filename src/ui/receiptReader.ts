@@ -60,3 +60,38 @@ export async function readReceipt(file: ReceiptFile, me?: OwnIdentity): Promise<
   const rows = toRows(ocr.lines);
   return { imageUri, receipt: parsePixReceipt(rows, me), text: rows.map((r) => r.join('   ')).join('\n') };
 }
+
+export interface StatementRead {
+  rows: ReturnType<typeof toRows>;
+  pages: number;
+  /** o PDF tinha mais páginas do que o limite lido */
+  truncated: boolean;
+  text: string;
+}
+
+/** Extrato: lê TODAS as páginas do PDF (até 30), uma depois da outra. */
+export async function readStatementFile(file: ReceiptFile, onPage?: (done: number, total: number) => void): Promise<StatementRead> {
+  if (!ReceiptReader) {
+    throw new Error('A leitura de extrato funciona só no app instalado (APK). No Expo Go ela não está disponível.');
+  }
+  const MAX = 30;
+  const rows: ReturnType<typeof toRows> = [];
+  let pages = 1;
+  let total = 1;
+  if (isPdf(file)) {
+    const first = await ReceiptReader.renderPdfPageAsync(file.uri, 0, 2000);
+    total = first.pageCount;
+    pages = Math.min(total, MAX);
+    for (let i = 0; i < pages; i++) {
+      onPage?.(i, pages);
+      const page = i === 0 ? first : await ReceiptReader.renderPdfPageAsync(file.uri, i, 2000);
+      const ocr = await ReceiptReader.recognizeTextAsync(page.uri);
+      rows.push(...toRows(ocr.lines));
+    }
+  } else {
+    const ocr = await ReceiptReader.recognizeTextAsync(file.uri);
+    rows.push(...toRows(ocr.lines));
+  }
+  if (!rows.length) throw new Error('Não encontrei texto nesse arquivo. Confira se é o PDF do extrato.');
+  return { rows, pages, truncated: total > pages, text: rows.map((r) => r.join('   ')).join('\n') };
+}

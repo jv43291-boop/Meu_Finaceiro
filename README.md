@@ -76,6 +76,11 @@ Aplicativo de finanças pessoais em Expo, React Native e TypeScript, sucessor do
   - aviso de comprovante repetido;
   - **mês certo:** entra na data do Pix escrita no comprovante, não no dia em que foi lido (Pix de agosto lido em setembro vai para agosto). Sem data legível, o campo fica vazio para digitar; data no futuro pede confirmação;
   - funciona só no APK, porque usa o módulo nativo.
+- **Importar extrato** (Mais → Importar extrato do mês, ou "Importar como extrato" quando um extrato cai na tela de comprovante):
+  - lê todas as páginas do PDF (até 30) no aparelho; cada linha com data e valor vira um lançamento;
+  - gasto ou entrada pelo sinal do valor ("-", "D"/"C", "+"); sem sinal, pelas palavras ("Pix enviado", "Salário"…); sem nada disso, a linha fica com "?" e não entra até você escolher;
+  - saldos e totais do dia não entram; aplicação, resgate, fatura do cartão e o que já está no app vêm desmarcados;
+  - importar o mesmo extrato de novo não duplica: cada linha guarda uma chave.
 - Lembretes de vencimento: notificações locais que agrupam o mesmo dia, com opção de esconder o valor na tela bloqueada.
 - Bloqueio com digital ou rosto, com a senha do celular como alternativa.
 - Exportar para planilha: CSV no padrão brasileiro.
@@ -139,6 +144,7 @@ TESTES (vitest)
 ├── Cartões ........ fatura, parcelas, pagamento
 ├── Planejamento ... orçamentos, metas, projeção, análise do mês
 ├── Pix/recibo ..... parser por banco, gasto × receita, casos ambíguos, regras, histórico
+├── Extrato ........ três formatos de extrato, sinal × palavras, saldos, repetidos
 ├── Integridade .... checagens e diagnóstico sem dados sensíveis
 └── Sync/offline ... motor, relógio, fila/quarentena, isolamento A↔B
                      (SQLite real via sql.js, só nos testes)
@@ -170,6 +176,7 @@ Só o que ainda **não** existe no código:
 
 - Assistente com IA, que interpreta os números calculados pelo domínio. Aguarda decisão sobre custo, provedor e privacidade; precisa de back-end, porque a chave não pode ficar no app.
 - Ajuste da leitura de comprovante com exemplos reais de cada banco (Itaú, Santander, PicPay, Nubank, Banco do Brasil, Caixa Tem, Caixa e Bradesco).
-- Transferência entre contas; importar extrato (OFX/CSV); backup em arquivo sem nuvem; widget no Android.
+- Ajuste da leitura de extrato com o PDF real de cada banco.
+- Transferência entre contas; importar OFX/CSV; backup em arquivo sem nuvem; widget no Android.
 - Resumo do comprometimento futuro do cartão; notificação de saldo projetado baixo.
 - Finanças familiares (compartilhamento e permissões); relatórios em PDF.

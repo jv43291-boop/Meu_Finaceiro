@@ -37,6 +37,8 @@ interface FinanceValue extends Snapshot {
   categoryById: Map<string, Category>;
   defaultAccountId: string | null;
   create: (input: EntryInput, repeat: Repeat) => Promise<void>;
+  /** vários lançamentos avulsos de uma vez (importar extrato): grava tudo junto */
+  createMany: (inputs: EntryInput[]) => Promise<void>;
   edit: (item: ListItem, patch: EntryPatch, scope: Scope) => Promise<void>;
   toggle: (item: ListItem) => Promise<void>;
   remove: (item: ListItem, scope: Scope) => Promise<void>;
@@ -112,6 +114,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       cardById: new Map(snap.cards.map((k) => [k.id, k])),
       defaultAccountId: active[0]?.id ?? snap.accounts[0]?.id ?? null,
       create: (input, repeat) => commit(createEntry(ctx, input, repeat)),
+      createMany: (inputs) =>
+        commit({ transactions: inputs.flatMap((i) => createEntry(ctx, i, { kind: 'none' }).transactions), recurrences: [] }),
       edit: (item, patch, scope) => commit(editItem(ctx, state, item, patch, scope)),
       toggle: (item) => {
         if (item.invoice && item.cardId && item.invoiceMonth) {

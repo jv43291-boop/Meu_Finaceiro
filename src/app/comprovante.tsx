@@ -74,6 +74,7 @@ export default function ReceiptScreen() {
   const [remember, setRemember] = useState(true);
   const [fromHistory, setFromHistory] = useState(false);
   const [descTouched, setDescTouched] = useState(false);
+  const lastFile = useRef<ReceiptFile | null>(null);
   const [busy, setBusy] = useState(false);
 
   const receipt = result?.receipt ?? null;
@@ -104,6 +105,7 @@ export default function ReceiptScreen() {
   }
 
   async function load(file: ReceiptFile) {
+    lastFile.current = file;
     setPhase('reading');
     try {
       const me = parseIdentity(await getMeta(db, IDENTITY_KEY).catch(() => null));
@@ -236,10 +238,19 @@ export default function ReceiptScreen() {
           <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>
             <T variant="bodyStrong" color={c.warning}>Isso parece um extrato, não um comprovante</T>
             <T variant="caption">
-              O arquivo tem vários lançamentos com data e valor. Esta tela lança um Pix por vez, então não vou transformar o extrato inteiro em um lançamento só. A importação de extrato (cada linha vira um lançamento, separando gastos e entradas) ainda está sendo feita.
+              O arquivo tem vários lançamentos com data e valor. Esta tela lança um Pix por vez; para o extrato, cada linha vira um lançamento separado, com gastos e entradas.
             </T>
           </Card>
-          <Button title="Ler um comprovante" icon="refresh" onPress={reset} />
+          <Button
+            title="Importar como extrato"
+            icon="file-table-outline"
+            onPress={() => {
+              const file = lastFile.current;
+              reset();
+              router.replace(file ? { pathname: '/extrato', params: { uri: file.uri, mime: file.mimeType ?? '', name: file.name ?? '' } } : '/extrato');
+            }}
+          />
+          <Button title="Ler um comprovante" icon="refresh" variant="secondary" onPress={reset} />
           <Button title={showText ? 'Esconder texto lido' : 'Ver texto lido'} icon="text-recognition" variant="ghost" onPress={() => setShowText((v) => !v)} />
           {showText ? (
             <Card>

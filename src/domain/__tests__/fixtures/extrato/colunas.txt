@@ -1,0 +1,14 @@
+BANCO EXEMPLO S.A.
+Extrato de conta corrente
+Cliente   CARLOS TESTE EXEMPLO
+Período   01/09/2026 a 30/09/2026
+Data   Lançamento   Valor   Saldo
+01/09/2026   Saldo anterior      1.000,00 C
+02/09/2026   Pix - Enviado   MERCADO EXEMPLO LTDA   45,90 D   954,10 C
+03/09/2026   Pix - Recebido   ANA EXEMPLO   150,00 C   1.104,10 C
+05/09/2026   Compra com cartão   PADARIA FICTICIA   12,50 D   1.091,60 C
+05/09/2026   Compra com cartão   PADARIA FICTICIA   12,50 D   1.079,10 C
+10/09/2026   Crédito de salário   EMPRESA FICTICIA   2.500,00 C   3.579,10 C
+15/09/2026   Pagamento de fatura cartão   800,00 D   2.779,10 C
+20/09/2026   Aplicação poupança   500,00 D   2.279,10 C
+30/09/2026   Saldo final      2.279,10 C

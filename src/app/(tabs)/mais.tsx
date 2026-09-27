@@ -35,6 +35,7 @@ export default function MoreScreen() {
       </Card>
       <Card>
         <ListRow icon="receipt-text-outline" title="Lançar comprovante de Pix" subtitle="Lê o print ou PDF e desconta do saldo" onPress={() => router.push('/comprovante')} />
+        <ListRow icon="file-table-outline" title="Importar extrato do mês" subtitle="PDF do banco: separa gastos e entradas" onPress={() => router.push('/extrato')} />
         <ListRow icon="account-switch-outline" title="Regras de recebedores" subtitle={payeeRules.length ? `${payeeRules.length} regra(s) · ex.: José Ribeiro = Compra de pão` : 'Troque o nome da pessoa pelo que foi o gasto'} onPress={() => router.push('/recebedores')} />
       </Card>
       <Card>
