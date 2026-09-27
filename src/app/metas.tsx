@@ -40,7 +40,7 @@ export default function GoalsScreen() {
                   <Amount cents={g.savedCents} size="heading" />
                   <T variant="caption">de {hidden ? 'R$ •••' : formatBRL(g.targetCents)}</T>
                 </View>
-                <BudgetBar ratio={p.pct} level="ok" label={`${Math.round(p.pct * 100)}% guardado`} />
+                <BudgetBar kind="goal" ratio={p.pct} level="ok" label={`${Math.round(p.pct * 100)}% guardado`} />
                 {!p.done && p.perMonthCents !== null ? (
                   <T variant="caption">
                     {p.late ? `Faltam ${hidden ? 'R$ •••' : formatBRL(p.remainingCents)}.` : `Guardar ${hidden ? 'R$ •••' : formatBRL(p.perMonthCents)} por mês (${p.monthsLeft} ${p.monthsLeft === 1 ? 'mês' : 'meses'}).`}

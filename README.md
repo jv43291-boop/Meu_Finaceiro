@@ -86,6 +86,7 @@ Aplicativo de finanças pessoais em Expo, React Native e TypeScript, sucessor do
 - Exportar para planilha: CSV no padrão brasileiro.
 - Importar o backup do Meu Financeiro 1.0.
 - Personalizar: tema claro/escuro, cor de destaque, foto de fundo e "esconder valores".
+- **Modo gamer** (Aparência): tema escuro neon, títulos em fonte pixelada, orçamento como barra de vida (HP, esvazia com o gasto), metas como barra de experiência (XP) e saldo como "ouro". Valores continuam na fonte normal. Liga/desliga a qualquer hora e volta ao padrão ao sair da conta.
 - Diagnóstico (Mais → Avançado):
   - SQLite, registros por tabela, conta, Supabase, estado da sincronização e relógio;
   - "Revalidar integridade", que só aponta problemas, sem corrigir;

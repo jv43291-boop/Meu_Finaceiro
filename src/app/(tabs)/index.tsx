@@ -7,7 +7,7 @@ import { currentInvoiceMonth, invoiceFor } from '@/domain/cards';
 import { budgetLevel, budgetLines, budgetTotals, goalPlan } from '@/domain/planning';
 import { cashItemsForMonth, overview, summarizeItems } from '@/domain/summary';
 import { useFinance } from '@/state/finance';
-import { Amount, Card, Empty, IconButton, ListRow, Pill, Screen, T } from '@/ui/components';
+import { Amount, Card, Empty, Icon, IconButton, ListRow, Pill, Screen, T } from '@/ui/components';
 import { BudgetBar } from '@/ui/Charts';
 import { ItemRow } from '@/ui/ItemRow';
 import { ProjectionCard } from '@/ui/ProjectionCard';
@@ -56,17 +56,24 @@ export default function HomeScreen() {
         </View>
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <IconButton icon={hideValues ? 'eye-off-outline' : 'eye-outline'} label={hideValues ? 'Mostrar valores' : 'Esconder valores'} onPress={toggleHideValues} />
-          <IconButton icon={scheme === 'dark' ? 'weather-night' : 'white-balance-sunny'} label="Aparência" onPress={() => router.push('/aparencia')} />
+          <IconButton icon={c.gamer ? 'gamepad-variant-outline' : scheme === 'dark' ? 'weather-night' : 'white-balance-sunny'} label="Aparência" onPress={() => router.push('/aparencia')} />
         </View>
       </View>
 
-      <View style={{ backgroundColor: c.hero, borderRadius: radius.xl, padding: 22, gap: 14 }}>
-        <T variant="caption" color={c.heroMuted}>Saldo em contas</T>
+      <View style={[{ backgroundColor: c.hero, borderRadius: c.gamer ? 12 : radius.xl, padding: 22, gap: 14 }, c.gamer && { borderWidth: 2, borderColor: c.primary }]}>
+        {c.gamer ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Icon name="treasure-chest" size={18} color={c.spark} />
+            <T variant="label" color={c.spark}>Ouro em contas</T>
+          </View>
+        ) : (
+          <T variant="caption" color={c.heroMuted}>Saldo em contas</T>
+        )}
         <Amount cents={ov.balance} size="display" color={c.onHero} />
         <View style={{ height: 1, backgroundColor: c.heroLine }} />
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: space.md }}>
           <View style={{ gap: 2, flex: 1 }}>
-            <T variant="caption" color={c.heroMuted}>Sobra até {lastDay} de {monthLabel(month, false).toLowerCase()}</T>
+            <T variant="caption" color={c.heroMuted}>{c.gamer ? 'Ouro previsto até' : 'Sobra até'} {lastDay} de {monthLabel(month, false).toLowerCase()}</T>
             <Amount cents={ov.forecast} size="amount" color={ov.forecast < 0 ? '#FFB4AD' : c.spark} />
           </View>
           <Pill tone="hero" label={daysLeft === 0 ? 'último dia' : daysLeft === 1 ? '1 dia' : `${daysLeft} dias`} />
@@ -131,7 +138,7 @@ export default function HomeScreen() {
                 <T variant="bodyStrong">{topGoal.name}</T>
                 <Amount cents={topGoal.savedCents} />
               </View>
-              <BudgetBar ratio={goalPlan(topGoal, today).pct} level="ok" label={`${Math.round(goalPlan(topGoal, today).pct * 100)}% da meta`} />
+              <BudgetBar kind="goal" ratio={goalPlan(topGoal, today).pct} level="ok" label={`${Math.round(goalPlan(topGoal, today).pct * 100)}% da meta`} />
             </Pressable>
           ) : null}
         </Card>

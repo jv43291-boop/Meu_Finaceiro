@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 
 import { shortMonthLabel } from '@/domain/dates';
 import { formatBRL } from '@/domain/money';
+import { hpSegments, SEGMENTS, xpSegments } from '@/domain/gamer';
 import type { BudgetLevel, MonthPoint } from '@/domain/planning';
 import { Icon, T } from './components';
 import { space, useColors, useHideValues } from './theme';
@@ -10,11 +11,12 @@ import { space, useColors, useHideValues } from './theme';
  * Barra de progresso com estado. O estado vem SEMPRE com ícone + texto,
  * nunca só pela cor (aviso ≥ 80%, estourado > 100%).
  */
-export function BudgetBar({ ratio, level, label }: { ratio: number; level: BudgetLevel; label?: string }) {
+export function BudgetBar({ ratio, level, label, kind = 'budget' }: { ratio: number; level: BudgetLevel; label?: string; kind?: 'budget' | 'goal' }) {
   const c = useColors();
   const color = level === 'over' ? c.danger : level === 'warn' ? c.warning : c.primary;
   const pct = Math.round(ratio * 100);
   const text = label ?? (level === 'over' ? `${pct}% · estourou` : level === 'warn' ? `${pct}% · perto do limite` : `${pct}%`);
+  if (c.gamer) return <GameBar ratio={ratio} level={level} text={text} kind={kind} />;
   return (
     <View style={{ gap: 6 }}>
       <View
@@ -26,6 +28,43 @@ export function BudgetBar({ ratio, level, label }: { ratio: number; level: Budge
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
         {level !== 'ok' ? <Icon name={level === 'over' ? 'alert-circle' : 'alert'} size={14} color={color} /> : null}
         <T variant="caption" color={level === 'ok' ? undefined : color} weight={level === 'ok' ? 'medium' : 'bold'}>{text}</T>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Barra em blocos do modo gamer. Orçamento = HP (esvazia com o gasto), meta = XP (enche).
+ * O estado continua com texto e ícone, não só com a cor.
+ */
+function GameBar({ ratio, level, text, kind }: { ratio: number; level: BudgetLevel; text: string; kind: 'budget' | 'goal' }) {
+  const c = useColors();
+  const isHp = kind === 'budget';
+  const filled = isHp ? hpSegments(ratio) : xpSegments(ratio);
+  const color = isHp ? (level === 'over' ? c.danger : level === 'warn' ? c.warning : c.income) : c.primary;
+  const tag = isHp ? 'HP' : 'XP';
+  const status = isHp ? (level === 'over' ? 'sem vida' : level === 'warn' ? 'vida baixa' : null) : filled === SEGMENTS ? 'missão cumprida' : null;
+  return (
+    <View style={{ gap: 6 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+        <T variant="label" color={color} style={{ minWidth: 22 }}>{tag}</T>
+        <View
+          accessibilityRole="progressbar"
+          accessibilityLabel={isHp ? 'Vida do orçamento' : 'Experiência da meta'}
+          accessibilityValue={{ min: 0, max: SEGMENTS, now: filled }}
+          style={{ flex: 1, flexDirection: 'row', gap: 3 }}>
+          {Array.from({ length: SEGMENTS }, (_, i) => (
+            <View
+              key={i}
+              style={{ flex: 1, height: 14, borderRadius: 2, backgroundColor: i < filled ? color : c.surfaceAlt, borderWidth: 1, borderColor: i < filled ? color : c.border }}
+            />
+          ))}
+        </View>
+        <T variant="caption" weight="bold" color={color} style={{ fontVariant: ['tabular-nums'] }}>{filled}/{SEGMENTS}</T>
+      </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {status ? <Icon name={isHp ? (level === 'over' ? 'skull-outline' : 'heart-half-full') : 'trophy'} size={14} color={color} /> : null}
+        <T variant="caption" color={status ? color : undefined} weight={status ? 'bold' : 'medium'}>{status ? `${status} · ${text}` : text}</T>
       </View>
     </View>
   );
@@ -48,8 +87,8 @@ export function HBarList({ rows, total }: { rows: { key: string; label: string; 
               <T variant="caption">{share}%</T>
               <T variant="bodyStrong" style={{ fontVariant: ['tabular-nums'], minWidth: 96, textAlign: 'right' }}>{hidden ? 'R$ •••' : formatBRL(r.cents)}</T>
             </View>
-            <View style={{ height: 8, borderRadius: 4, backgroundColor: c.surfaceAlt }}>
-              <View style={{ width: `${(r.cents / max) * 100}%`, height: 8, borderRadius: 4, backgroundColor: c.primary }} />
+            <View style={{ height: c.gamer ? 12 : 8, borderRadius: c.gamer ? 2 : 4, backgroundColor: c.surfaceAlt }}>
+              <View style={{ width: `${(r.cents / max) * 100}%`, height: c.gamer ? 12 : 8, borderRadius: c.gamer ? 2 : 4, backgroundColor: c.primary }} />
             </View>
           </View>
         );

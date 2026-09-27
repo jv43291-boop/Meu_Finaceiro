@@ -3,6 +3,8 @@ import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/
 import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
 import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
 import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
+import { PixelifySans_500Medium } from '@expo-google-fonts/pixelify-sans/500Medium';
+import { PixelifySans_700Bold } from '@expo-google-fonts/pixelify-sans/700Bold';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -18,7 +20,7 @@ import { FinanceProvider, useFinance } from '@/state/finance';
 import { LockProvider } from '@/state/lock';
 import { RemindersProvider } from '@/state/reminders';
 import { T } from '@/ui/components';
-import { AppThemeProvider, fonts, useAppTheme } from '@/ui/theme';
+import { AppThemeProvider, fonts, pixelFonts, useAppTheme } from '@/ui/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -57,7 +59,7 @@ function ThemedApp() {
         <RemindersProvider>
         <LockProvider>
         <Gate>
-          <Stack screenOptions={{ headerTintColor: c.text, headerStyle: { backgroundColor: c.background }, headerTitleStyle: { fontFamily: fonts.extrabold, fontSize: 17 }, headerShadowVisible: false, contentStyle: { backgroundColor: c.canvas } }}>
+          <Stack screenOptions={{ headerTintColor: c.text, headerStyle: { backgroundColor: c.background }, headerTitleStyle: { fontFamily: c.gamer ? pixelFonts.bold : fonts.extrabold, fontSize: c.gamer ? 18 : 17 }, headerShadowVisible: false, contentStyle: { backgroundColor: c.canvas } }}>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="lancamento/novo" options={{ title: 'Novo lançamento', presentation: 'modal' }} />
             <Stack.Screen name="lancamento/[key]" options={{ title: 'Lançamento' }} />
@@ -101,6 +103,8 @@ export default function RootLayout() {
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
+    PixelifySans_500Medium,
+    PixelifySans_700Bold,
   });
   // sem fonte (erro raro), segue com a fonte do sistema em vez de travar na abertura
   if (!fontsLoaded && !fontError) return null;

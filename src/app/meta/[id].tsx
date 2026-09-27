@@ -47,7 +47,7 @@ function GoalDetail({ goal }: { goal: Goal }) {
         <T variant="caption" color="rgba(255,255,255,0.85)">de {money(goal.targetCents)}{goal.targetDate ? ` até ${formatDateBR(goal.targetDate)}` : ''}</T>
       </View>
       <Card>
-        <BudgetBar ratio={p.pct} level="ok" label={p.done ? 'Meta concluída' : `${Math.round(p.pct * 100)}% guardado · faltam ${money(p.remainingCents)}`} />
+        <BudgetBar kind="goal" ratio={p.pct} level="ok" label={p.done ? 'Meta concluída' : `${Math.round(p.pct * 100)}% guardado · faltam ${money(p.remainingCents)}`} />
         {!p.done && p.perMonthCents !== null ? (
           <T variant="caption">{p.late ? 'A data passou. Ajuste a data ou continue guardando.' : `Para chegar na data: ${money(p.perMonthCents)} por mês, durante ${p.monthsLeft} ${p.monthsLeft === 1 ? 'mês' : 'meses'}.`}</T>
         ) : null}

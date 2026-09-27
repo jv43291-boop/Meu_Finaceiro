@@ -65,10 +65,53 @@ const dark: typeof light = {
   chartExpense: '#D9603F',
 };
 
+/**
+ * Modo gamer: sempre escuro, fundo roxo-noite e destaque neon.
+ * Receita/gasto/aviso mantêm significado e contraste AA sobre o fundo.
+ */
+const gamer: typeof light = {
+  background: '#07060F',
+  surface: '#13102A',
+  surfaceAlt: '#1D1940',
+  text: '#F1EFFF',
+  muted: '#A39FD0',
+  border: '#2F2A5E',
+  primary: '#00D9FF',
+  primaryText: '#5CEBFF',
+  primarySoft: '#0B2A3A',
+  onPrimary: '#05040D',
+  hero: '#1A1250',
+  onHero: '#FFFFFF',
+  heroMuted: 'rgba(255,255,255,0.8)',
+  heroLine: 'rgba(255,255,255,0.18)',
+  heroChip: 'rgba(255,255,255,0.14)',
+  spark: '#FFE14D',
+  income: '#3DFFA2',
+  expense: '#FF5C93',
+  warning: '#FFC83D',
+  warningSoft: '#3A2B0A',
+  danger: '#FF5C73',
+  overlay: 'rgba(0, 0, 0, 0.7)',
+  shadowOpacity: 0,
+  chartIncome: '#2EE6B0',
+  chartExpense: '#FF6B9A',
+};
+
+/** no modo gamer cada cor de destaque vira um neon (texto escuro por cima) */
+const GAMER_ACCENTS: Record<string, { primary: string; primaryText: string; primarySoft: string }> = {
+  violeta: { primary: '#B77BFF', primaryText: '#CFA6FF', primarySoft: '#2A1A4D' },
+  azul: { primary: '#00D9FF', primaryText: '#5CEBFF', primarySoft: '#0B2A3A' },
+  verde: { primary: '#3DFFA2', primaryText: '#7DFFC2', primarySoft: '#0E3326' },
+  rosa: { primary: '#FF5CCB', primaryText: '#FF9BDE', primarySoft: '#3D1234' },
+  laranja: { primary: '#FFA03D', primaryText: '#FFC285', primarySoft: '#3D250C' },
+};
+
 export type Colors = typeof light & {
   /** fundo das telas (sempre opaco; a foto, quando existe, é desenhada por cima dele em cada tela) */
   canvas: string;
   hasBackground: boolean;
+  /** modo gamer ligado: componentes trocam fonte, bordas e barras */
+  gamer: boolean;
 };
 
 /** Cores de destaque que a pessoa pode escolher. Todas com texto branco em contraste AA. */
@@ -126,10 +169,14 @@ export const fonts = {
 } as const;
 export type FontWeightName = keyof typeof fonts;
 
+/** fonte pixelada do modo gamer: só em títulos e rótulos (números e textos longos continuam na fonte normal) */
+export const pixelFonts = { medium: 'PixelifySans_500Medium', bold: 'PixelifySans_700Bold' } as const;
+
 const THEME_KEY = 'theme';
 const HIDE_KEY = 'hide_values';
 const ACCENT_KEY = 'accent';
 const BG_KEY = 'background';
+const GAMER_KEY = 'gamer_mode';
 
 interface ThemeValue {
   preference: ThemePreference;
@@ -143,6 +190,9 @@ interface ThemeValue {
   setAccent: (a: AccentName) => void;
   background: BackgroundSettings;
   setBackground: (b: BackgroundSettings) => void;
+  /** modo gamer (visual temático, sempre escuro) */
+  gamer: boolean;
+  setGamer: (on: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeValue | null>(null);
@@ -163,10 +213,11 @@ function parseBackground(raw: string | null): BackgroundSettings {
   }
 }
 
-export function buildColors(scheme: Scheme, accent: AccentName, hasBackground: boolean): Colors {
+export function buildColors(scheme: Scheme, accent: AccentName, hasBackground: boolean, isGamer = false): Colors {
+  if (isGamer) return { ...gamer, ...GAMER_ACCENTS[accent], canvas: gamer.background, hasBackground, gamer: true };
   const base = scheme === 'dark' ? dark : light;
   const a = ACCENTS[accent][scheme];
-  return { ...base, ...a, canvas: base.background, hasBackground };
+  return { ...base, ...a, canvas: base.background, hasBackground, gamer: false };
 }
 
 function isPreference(v: unknown): v is ThemePreference {
@@ -184,6 +235,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [hideValues, setHide] = useState(false);
   const [accent, setAccentState] = useState<AccentName>('violeta');
   const [background, setBgState] = useState<BackgroundSettings>(DEFAULT_BG);
+  const [gamerOn, setGamerState] = useState(false);
 
   useEffect(() => {
     getMeta(db, ACCENT_KEY)
@@ -198,6 +250,9 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     getMeta(db, HIDE_KEY)
       .then((v) => setHide(v === '1'))
       .catch(() => undefined);
+    getMeta(db, GAMER_KEY)
+      .then((v) => setGamerState(v === '1'))
+      .catch(() => undefined);
   }, [db]);
 
   // saiu da conta: tema, cor, foto e "esconder valores" voltam ao padrão
@@ -208,16 +263,18 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
         setHide(false);
         setAccentState('violeta');
         setBgState(DEFAULT_BG);
+        setGamerState(false);
       }),
     [],
   );
 
   useEffect(() => {
-    Appearance.setColorScheme?.(preference === 'system' ? 'unspecified' : preference);
-  }, [preference]);
+    Appearance.setColorScheme?.(gamerOn ? 'dark' : preference === 'system' ? 'unspecified' : preference);
+  }, [preference, gamerOn]);
 
-  const scheme: Scheme = preference === 'system' ? (system === 'dark' ? 'dark' : 'light') : preference;
-  const colors = useMemo(() => buildColors(scheme, accent, !!background.uri), [scheme, accent, background.uri]);
+  // o modo gamer é sempre escuro (teclado, alertas e componentes nativos também)
+  const scheme: Scheme = gamerOn ? 'dark' : preference === 'system' ? (system === 'dark' ? 'dark' : 'light') : preference;
+  const colors = useMemo(() => buildColors(scheme, accent, !!background.uri, gamerOn), [scheme, accent, background.uri, gamerOn]);
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.background).catch(() => undefined);
@@ -253,9 +310,17 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     [db],
   );
 
+  const setGamer = useCallback(
+    (on: boolean) => {
+      setGamerState(on);
+      setMeta(db, GAMER_KEY, on ? '1' : '0').catch(() => undefined);
+    },
+    [db],
+  );
+
   const value = useMemo(
-    () => ({ preference, scheme, colors, setPreference, hideValues, toggleHideValues, accent, setAccent, background, setBackground }),
-    [preference, scheme, colors, setPreference, hideValues, toggleHideValues, accent, setAccent, background, setBackground],
+    () => ({ preference, scheme, colors, setPreference, hideValues, toggleHideValues, accent, setAccent, background, setBackground, gamer: gamerOn, setGamer }),
+    [preference, scheme, colors, setPreference, hideValues, toggleHideValues, accent, setAccent, background, setBackground, gamerOn, setGamer],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

@@ -12,7 +12,7 @@ import { formatBRL } from '@/domain/money';
 import type { Scope } from '@/domain/recurrence';
 import type { EntryType } from '@/domain/types';
 import { AppBackground } from './AppBackground';
-import { fonts, radius, space, useColors, useHideValues, type Colors, type FontWeightName } from './theme';
+import { fonts, pixelFonts, radius, space, useColors, useHideValues, type Colors, type FontWeightName } from './theme';
 
 export type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
@@ -82,16 +82,19 @@ const VARIANT: Record<TextVariant, { size: number; weight: FontWeightName; spaci
 };
 
 export function T({
-  children, variant = 'body', color, style, numberOfLines, weight, selectable,
-}: { children: ReactNode; variant?: TextVariant; color?: string; style?: StyleProp<TextStyle>; numberOfLines?: number; weight?: FontWeightName; selectable?: boolean }) {
+  children, variant = 'body', color, style, numberOfLines, weight, selectable, plain,
+}: { children: ReactNode; variant?: TextVariant; color?: string; style?: StyleProp<TextStyle>; numberOfLines?: number; weight?: FontWeightName; selectable?: boolean; plain?: boolean }) {
   const c = useColors();
   const v = VARIANT[variant];
+  // modo gamer: títulos e rótulos na fonte pixelada; valores e textos longos continuam legíveis
+  const pixel = c.gamer && !plain && (variant === 'title' || variant === 'heading' || variant === 'label');
+  const family = pixel ? (variant === 'label' ? pixelFonts.medium : pixelFonts.bold) : fonts[weight ?? v.weight];
   return (
     <Text
       numberOfLines={numberOfLines}
       selectable={selectable}
       style={[
-        { fontFamily: fonts[weight ?? v.weight], fontSize: v.size, letterSpacing: v.spacing ?? 0, color: color ?? (v.muted ? c.muted : c.text) },
+        { fontFamily: family, fontSize: pixel ? v.size + 1 : v.size, letterSpacing: pixel ? 0.4 : (v.spacing ?? 0), color: color ?? (v.muted ? c.muted : c.text) },
         v.upper && { textTransform: 'uppercase' },
         style,
       ]}>
@@ -103,7 +106,14 @@ export function T({
 export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
   const c = useColors();
   return (
-    <View style={[{ backgroundColor: c.surface, borderRadius: radius.lg, padding: space.lg, gap: space.md }, cardShadow(c), style]}>
+    <View
+      style={[
+        { backgroundColor: c.surface, borderRadius: c.gamer ? 10 : radius.lg, padding: space.lg, gap: space.md },
+        cardShadow(c),
+        // modo gamer: moldura neon discreta
+        c.gamer && { borderWidth: 1, borderColor: c.primary + '55' },
+        style,
+      ]}>
       {children}
     </View>
   );
@@ -118,7 +128,7 @@ export function Amount({ cents, type, size = 'bodyStrong', signed = false, color
   const tone = color ?? (type === 'income' ? c.income : type === 'expense' ? c.expense : c.text);
   const sign = signed && type ? (type === 'income' ? '+ ' : '− ') : '';
   return (
-    <T variant={size} color={tone} weight={size === 'bodyStrong' ? 'bold' : undefined} style={{ fontVariant: ['tabular-nums'] }}>
+    <T variant={size} color={tone} weight={size === 'bodyStrong' ? 'bold' : undefined} plain style={{ fontVariant: ['tabular-nums'] }}>
       {hidden ? 'R$ •••••' : `${sign}${formatBRL(cents)}`}
     </T>
   );
@@ -137,12 +147,13 @@ export function Button({
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
-        { backgroundColor: bg, borderRadius: radius.md + 4, paddingHorizontal: space.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, opacity: disabled ? 0.5 : pressed ? 0.85 : 1, minHeight: 54 },
+        { backgroundColor: bg, borderRadius: c.gamer ? 8 : radius.md + 4, paddingHorizontal: space.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm, opacity: disabled ? 0.5 : pressed ? 0.85 : 1, minHeight: 54 },
         variant === 'danger' && { borderWidth: 1.5, borderColor: c.danger },
+        c.gamer && variant === 'secondary' && { borderWidth: 1, borderColor: c.border },
         style,
       ]}>
       {icon ? <Icon name={icon} size={20} color={fg} /> : null}
-      <Text style={{ color: fg, fontSize: 16, fontFamily: fonts.extrabold }}>{title}</Text>
+      <Text style={{ color: fg, fontSize: c.gamer ? 17 : 16, fontFamily: c.gamer ? pixelFonts.bold : fonts.extrabold, letterSpacing: c.gamer ? 0.5 : 0 }}>{title}</Text>
     </Pressable>
   );
 }

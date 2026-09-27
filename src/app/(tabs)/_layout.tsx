@@ -3,7 +3,7 @@ import { Pressable, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, InTabsContext, cardShadow } from '@/ui/components';
-import { fonts, useColors } from '@/ui/theme';
+import { fonts, pixelFonts, useColors } from '@/ui/theme';
 
 export default function TabsLayout() {
   const c = useColors();
@@ -20,7 +20,7 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarActiveTintColor: c.primaryText,
         tabBarInactiveTintColor: c.muted,
-        tabBarLabelStyle: { fontFamily: fonts.bold, fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: c.gamer ? pixelFonts.bold : fonts.bold, fontSize: c.gamer ? 12 : 11 },
         tabBarStyle: { backgroundColor: c.surface, borderTopColor: c.border, height: 68 + bottom, paddingTop: 6, paddingBottom: Math.max(bottom, 8) },
       }}>
       <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: icon('home-outline', 'home') }} />
