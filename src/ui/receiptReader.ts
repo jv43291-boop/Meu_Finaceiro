@@ -7,6 +7,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
 import { ReceiptReader } from '../../modules/receipt-reader';
+import type { OwnIdentity } from '@/domain/pixIdentity';
 import { parsePixReceipt, toRows, type PixReceipt } from '@/domain/pixReceipt';
 
 export interface ReceiptFile {
@@ -44,7 +45,8 @@ export function isPdf(file: ReceiptFile): boolean {
   return file.mimeType === 'application/pdf' || /\.pdf$/i.test(file.name ?? file.uri);
 }
 
-export async function readReceipt(file: ReceiptFile): Promise<ReadResult> {
+/** `me`: quem é você nos comprovantes, para saber se foi gasto ou receita */
+export async function readReceipt(file: ReceiptFile, me?: OwnIdentity): Promise<ReadResult> {
   if (!ReceiptReader) {
     throw new Error('A leitura de comprovante funciona só no app instalado (APK). No Expo Go ela não está disponível.');
   }
@@ -56,5 +58,5 @@ export async function readReceipt(file: ReceiptFile): Promise<ReadResult> {
   const ocr = await ReceiptReader.recognizeTextAsync(imageUri);
   if (!ocr.lines.length) throw new Error('Não encontrei texto nesse arquivo. Tente o print ou o PDF do comprovante.');
   const rows = toRows(ocr.lines);
-  return { imageUri, receipt: parsePixReceipt(rows), text: rows.map((r) => r.join('   ')).join('\n') };
+  return { imageUri, receipt: parsePixReceipt(rows, me), text: rows.map((r) => r.join('   ')).join('\n') };
 }

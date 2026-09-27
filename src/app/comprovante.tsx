@@ -1,12 +1,16 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { clearSharedPayloads, useIncomingShare } from 'expo-sharing';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
 
+import { getMeta, setMeta } from '@/db/repo';
 import { formatDateBR, parseDateBR, todayISO, type DateISO } from '@/domain/dates';
 import { formatBRL, formatPlain, parseMoney } from '@/domain/money';
 import { findDuplicatePix, findPayeeRule, normalizeName, suggestFromHistory, upsertPayeeRule } from '@/domain/payeeRules';
+import { learnIdentity, parseIdentity } from '@/domain/pixIdentity';
+import type { PixReceipt } from '@/domain/pixReceipt';
 import type { EntryType } from '@/domain/types';
 import { ctx, useFinance } from '@/state/finance';
 import { Button, Card, Chip, Empty, Field, Input, Pill, Screen, Segmented, SwitchRow, T, tapFeedback } from '@/ui/components';
@@ -22,6 +26,16 @@ function titleCase(name: string): string {
     .split(/\s+/)
     .map((w, i) => (i > 0 && small.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
     .join(' ');
+}
+
+/** onde fica, no aparelho, quem é você nos comprovantes (apagado ao sair da conta) */
+const IDENTITY_KEY = 'pix_identity';
+
+/** a outra parte depende do sentido: no gasto é quem recebeu; na receita, quem pagou */
+function otherSide(r: PixReceipt, type: EntryType | null) {
+  if (type === 'income') return r.payer;
+  if (type === 'expense') return r.payee;
+  return { name: r.counterpartName, doc: r.counterpartDoc };
 }
 
 function maskDoc(doc: string): string {
@@ -44,11 +58,13 @@ function ShareListener({ onFile }: { onFile: (f: ReceiptFile) => void }) {
 export default function ReceiptScreen() {
   const c = useColors();
   const f = useFinance();
+  const db = useSQLiteContext();
   const [phase, setPhase] = useState<'pick' | 'reading' | 'review'>('pick');
   const [result, setResult] = useState<ReadResult | null>(null);
   const [showText, setShowText] = useState(false);
 
-  const [type, setType] = useState<EntryType>('expense');
+  // null = o comprovante não diz se foi gasto ou receita: a pessoa escolhe (nunca vira gasto sozinho)
+  const [type, setType] = useState<EntryType | null>(null);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -56,31 +72,49 @@ export default function ReceiptScreen() {
   const [dateText, setDateText] = useState(formatDateBR(todayISO()));
   const [remember, setRemember] = useState(true);
   const [fromHistory, setFromHistory] = useState(false);
+  const [descTouched, setDescTouched] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const receipt = result?.receipt ?? null;
-  const name = receipt?.counterpartName ?? null;
-  const doc = receipt?.counterpartDoc ?? null;
+  const side = receipt ? otherSide(receipt, type) : null;
+  const name = side?.name ?? null;
+  const doc = side?.doc ?? null;
   const rule = useMemo(() => findPayeeRule(f.payeeRules, name, doc), [f.payeeRules, name, doc]);
   const duplicate = useMemo(() => findDuplicatePix(f.transactions, receipt?.pixId ?? null), [f.transactions, receipt?.pixId]);
+
+  /** descrição, categoria e conta sugeridas para a outra parte daquele sentido */
+  function prefill(r: PixReceipt, t: EntryType | null, keepDescription: boolean) {
+    const p = otherSide(r, t);
+    const found = findPayeeRule(f.payeeRules, p.name, p.doc);
+    // sem regra: sugere pelo que a pessoa já lançou para esse recebedor
+    const hist = found ? null : suggestFromHistory(f.transactions, p.name);
+    const fitsType = (id: string | null | undefined) => (id && t && f.categoryById.get(id)?.type === t ? id : null);
+    setFromHistory(!!hist);
+    if (!keepDescription) setDescription(found?.description ?? hist?.description ?? (p.name ? titleCase(p.name) : 'Pix'));
+    setCategoryId(fitsType(found?.categoryId) ?? fitsType(hist?.categoryId));
+    setAccountId(found?.accountId ?? f.defaultAccountId);
+    // transferência para você mesmo: não vale criar regra "seu nome = descrição"
+    setRemember(!found && !r.ownTransfer);
+  }
+
+  function chooseType(t: EntryType) {
+    setType(t);
+    if (receipt) prefill(receipt, t, descTouched);
+  }
 
   async function load(file: ReceiptFile) {
     setPhase('reading');
     try {
-      const r = await readReceipt(file);
-      const found = findPayeeRule(f.payeeRules, r.receipt.counterpartName, r.receipt.counterpartDoc);
-      // sem regra: sugere pelo que a pessoa já lançou para esse recebedor
-      const hist = found ? null : suggestFromHistory(f.transactions, r.receipt.counterpartName);
-      setFromHistory(!!hist);
+      const me = parseIdentity(await getMeta(db, IDENTITY_KEY).catch(() => null));
+      const r = await readReceipt(file, me);
+      // só escolhe sozinho quando o comprovante mostra: o seu nome/CPF em um dos lados, ou "enviado"/"recebido"
+      const t: EntryType | null = r.receipt.directionSource === 'default' ? null : r.receipt.direction === 'received' ? 'income' : 'expense';
       setResult(r);
-      setType(r.receipt.direction === 'received' ? 'income' : 'expense');
+      setType(t);
+      setDescTouched(false);
+      prefill(r.receipt, t, false);
       setAmount(r.receipt.amountCents ? formatPlain(r.receipt.amountCents) : '');
-      setDescription(found?.description ?? hist?.description ?? (r.receipt.counterpartName ? titleCase(r.receipt.counterpartName) : 'Pix'));
-      setCategoryId(found?.categoryId ?? hist?.categoryId ?? null);
-      setAccountId(found?.accountId ?? f.defaultAccountId);
       setDateText(formatDateBR(r.receipt.date ?? todayISO()));
-      // transferência para você mesmo: não vale criar regra "seu nome = descrição"
-      setRemember(!found && !r.receipt.ownTransfer);
       setShowText(false);
       setPhase('review');
       tapFeedback('success');
@@ -110,6 +144,7 @@ export default function ReceiptScreen() {
   async function save() {
     const cents = parseMoney(amount);
     const date: DateISO | null = parseDateBR(dateText, new Date().getFullYear());
+    if (!type) return notify('Foi gasto ou receita?', 'Escolha “Paguei” ou “Recebi” antes de lançar.');
     if (!cents || cents <= 0) return notify('Confira o valor', 'Informe um valor maior que zero.');
     if (!date) return notify('Confira a data', 'Use o formato dd/mm/aaaa.');
     if (!description.trim()) return notify('Falta a descrição', 'Ex.: Compra de pão');
@@ -124,6 +159,12 @@ export default function ReceiptScreen() {
         },
         { kind: 'none' },
       );
+      // aprende quem é você: no gasto, quem pagou; na receita, quem recebeu
+      if (receipt) {
+        const mine = type === 'income' ? receipt.payee : receipt.payer;
+        const me = parseIdentity(await getMeta(db, IDENTITY_KEY).catch(() => null));
+        await setMeta(db, IDENTITY_KEY, JSON.stringify(learnIdentity(me, mine))).catch(() => undefined);
+      }
       if (remember && name && normalizeName(name)) {
         await f.savePayeeRule(upsertPayeeRule(f.payeeRules, { name, doc, description, categoryId, accountId }, ctx));
       } else if (rule) {
@@ -180,7 +221,7 @@ export default function ReceiptScreen() {
             <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>
               <T variant="bodyStrong" color={c.warning}>Parece transferência entre suas contas</T>
               <T variant="caption">
-                O mesmo CPF aparece como quem pagou e quem recebeu. Se lançar como {type === 'income' ? 'receita' : 'gasto'}, o saldo total muda sem você ter {type === 'income' ? 'recebido' : 'gastado'} nada. Normalmente não é para lançar.
+                Você aparece como quem pagou e como quem recebeu. Se lançar como {type === 'income' ? 'receita' : 'gasto'}, o saldo total muda sem você ter {type === 'income' ? 'recebido' : 'gastado'} nada. Normalmente não é para lançar.
               </T>
             </Card>
           ) : null}
@@ -197,7 +238,7 @@ export default function ReceiptScreen() {
           <Card style={{ flexDirection: 'row', gap: space.md, alignItems: 'center' }}>
             <Image source={{ uri: result.imageUri }} contentFit="contain" style={{ width: 64, height: 96, borderRadius: 8, backgroundColor: c.surfaceAlt }} />
             <View style={{ flex: 1, gap: 4 }}>
-              <T variant="caption">{receipt.direction === 'received' ? 'Quem mandou' : 'Quem recebeu'}</T>
+              <T variant="caption">{type === 'income' ? 'Quem mandou' : type === 'expense' ? 'Quem recebeu' : 'Outra parte'}</T>
               <T variant="bodyStrong">{name ?? 'Não encontrei o nome'}</T>
               {doc ? <T variant="caption">{maskDoc(doc)}</T> : null}
               <View style={{ flexDirection: 'row', gap: space.sm, flexWrap: 'wrap' }}>
@@ -208,18 +249,33 @@ export default function ReceiptScreen() {
             </View>
           </Card>
 
-          <Segmented
-            value={type}
-            onChange={(t) => { setType(t); setCategoryId(null); }}
-            options={[{ value: 'expense', label: 'Paguei', color: c.expense }, { value: 'income', label: 'Recebi', color: c.income }]}
-          />
+          <Field
+            label="Foi gasto ou receita?"
+            hint={
+              !type ? undefined
+              : receipt.directionSource === 'identity' ? `Reconheci você como quem ${type === 'income' ? 'recebeu' : 'pagou'}.`
+              : receipt.directionSource === 'keyword' ? `O comprovante diz que o Pix foi ${type === 'income' ? 'recebido' : 'enviado'}.`
+              : undefined
+            }
+          >
+            {!type ? (
+              <T variant="caption" color={c.warning}>
+                O comprovante não diz se você pagou ou recebeu. Escolha abaixo: nas próximas vezes eu reconheço você pelo nome.
+              </T>
+            ) : null}
+            <Segmented
+              value={type}
+              onChange={chooseType}
+              options={[{ value: 'expense', label: 'Paguei', color: c.expense }, { value: 'income', label: 'Recebi', color: c.income }]}
+            />
+          </Field>
 
           <Field label="Valor" hint={receipt.amountCents ? undefined : 'Não achei o valor no comprovante: digite.'}>
             <Input large value={amount} onChangeText={setAmount} placeholder="0,00" keyboardType="decimal-pad" />
           </Field>
 
           <Field label="Descrição" hint={name ? `Troque o nome da pessoa pelo que foi o gasto. Ex.: ${type === 'income' ? 'Venda do bolo' : 'Compra de pão'}` : undefined}>
-            <Input value={description} onChangeText={setDescription} placeholder="Ex.: Compra de pão" maxLength={200} />
+            <Input value={description} onChangeText={(v) => { setDescription(v); setDescTouched(true); }} placeholder="Ex.: Compra de pão" maxLength={200} />
           </Field>
 
           <Field label="Categoria">
@@ -247,13 +303,18 @@ export default function ReceiptScreen() {
           {name ? (
             <SwitchRow
               title={`Lembrar para ${titleCase(name)}`}
-              subtitle={`Nos próximos Pix para essa pessoa, já vem “${description.trim() || '…'}”${categoryId ? ` em ${f.categoryById.get(categoryId)?.name ?? ''}` : ''}.`}
+              subtitle={`Nos próximos Pix com essa pessoa, já vem “${description.trim() || '…'}”${categoryId ? ` em ${f.categoryById.get(categoryId)?.name ?? ''}` : ''}.`}
               value={remember}
               onChange={setRemember}
             />
           ) : null}
 
-          <Button title={duplicate || receipt.ownTransfer ? 'Lançar mesmo assim' : type === 'income' ? 'Lançar como recebido' : 'Lançar como pago'} icon="check" onPress={save} disabled={busy} />
+          <Button
+            title={!type ? 'Escolha Paguei ou Recebi' : duplicate || receipt.ownTransfer ? 'Lançar mesmo assim' : type === 'income' ? 'Lançar como recebido' : 'Lançar como pago'}
+            icon="check"
+            onPress={save}
+            disabled={busy || !type}
+          />
           <Button title="Ler outro comprovante" icon="refresh" variant="secondary" onPress={reset} disabled={busy} />
 
           <Button title={showText ? 'Esconder texto lido' : 'Ver texto lido'} icon="text-recognition" variant="ghost" onPress={() => setShowText((v) => !v)} />

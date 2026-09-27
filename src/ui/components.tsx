@@ -174,7 +174,7 @@ export function Chip({ label, selected, onPress, icon, color }: { label: string;
   );
 }
 
-export function Segmented<V extends string>({ options, value, onChange }: { options: { value: V; label: string; color?: string }[]; value: V; onChange: (v: V) => void }) {
+export function Segmented<V extends string>({ options, value, onChange }: { options: { value: V; label: string; color?: string }[]; value: V | null; onChange: (v: V) => void }) {
   const c = useColors();
   return (
     <View accessibilityRole="tablist" style={{ flexDirection: 'row', backgroundColor: c.surfaceAlt, borderRadius: radius.md + 2, padding: 4, gap: 4 }}>

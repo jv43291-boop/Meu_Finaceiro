@@ -71,6 +71,7 @@ Aplicativo de finanças pessoais em Expo, React Native e TypeScript, sucessor do
 - **Comprovante de Pix** (Mais → Lançar comprovante de Pix, ou "Compartilhar → Live" no app do banco):
   - a leitura é feita no aparelho: foto ou PDF → OCR → valor, recebedor, CPF/CNPJ, data, hora e ID do Pix;
   - uma tela de conferência aparece sempre, e nada é lançado sem confirmação;
+  - **gasto ou receita**: o app só escolhe sozinho quando o comprovante mostra o sentido — o seu nome/CPF em um dos lados (aprendido dos comprovantes que você confirmou, guardado só no aparelho e apagado ao sair da conta) ou frases como "Pix enviado"/"Você recebeu". Sem isso, a tela pede "Paguei" ou "Recebi" e não lança nada até você escolher; você dos dois lados vira aviso de transferência entre suas contas;
   - **regras por recebedor** (ex.: "José Ribeiro" vira "Compra de pão"), com sugestão pelo histórico quando não há regra;
   - aviso de comprovante repetido;
   - funciona só no APK, porque usa o módulo nativo.
@@ -131,7 +132,7 @@ TESTES (vitest)
 ├── Domínio ........ dinheiro, datas, recorrência, operações, CSV, lembretes
 ├── Cartões ........ fatura, parcelas, pagamento
 ├── Planejamento ... orçamentos, metas, projeção, análise do mês
-├── Pix/recibo ..... parser, casos ambíguos, regras, histórico
+├── Pix/recibo ..... parser por banco, gasto × receita, casos ambíguos, regras, histórico
 ├── Integridade .... checagens e diagnóstico sem dados sensíveis
 └── Sync/offline ... motor, relógio, fila/quarentena, isolamento A↔B
                      (SQLite real via sql.js, só nos testes)

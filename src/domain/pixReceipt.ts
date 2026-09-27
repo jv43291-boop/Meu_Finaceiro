@@ -10,6 +10,7 @@
  * Nada aqui é definitivo: o resultado sempre passa pela tela de conferência.
  */
 import type { DateISO } from './dates';
+import { EMPTY_IDENTITY, isMe, type OwnIdentity, type Party } from './pixIdentity';
 
 export interface TextLine {
   text: string;
@@ -24,6 +25,14 @@ export type Row = string[];
 
 export type PixDirection = 'sent' | 'received';
 
+/**
+ * De onde veio o sentido (gasto ou receita):
+ * - identity: o seu nome/CPF aparece em um dos lados;
+ * - keyword: o comprovante diz "Pix enviado", "Pix recebido"…;
+ * - default: não deu para saber (a tela pede para você escolher).
+ */
+export type DirectionSource = 'identity' | 'keyword' | 'default';
+
 export interface PixReceipt {
   amountCents: number | null;
   /** nome de quem recebeu (Pix enviado) ou de quem mandou (Pix recebido) */
@@ -35,11 +44,15 @@ export interface PixReceipt {
   /** ID do Pix (E2E, 32 caracteres) ou outro código de autenticação */
   pixId: string | null;
   direction: PixDirection;
+  directionSource: DirectionSource;
+  /** os dois lados como aparecem no comprovante */
+  payer: Party;
+  payee: Party;
   /** banco do app que gerou o comprovante, quando dá para saber */
   bank: string | null;
   /** o texto parece mesmo um comprovante de Pix */
   looksLikePix: boolean;
-  /** mesma pessoa dos dois lados (mesmo CPF/CNPJ visível): transferência entre contas próprias */
+  /** mesma pessoa dos dois lados (mesmo CPF/CNPJ visível, ou você nos dois): transferência entre contas próprias */
   ownTransfer: boolean;
 }
 
@@ -247,10 +260,22 @@ const BANKS: [RegExp, string][] = [
   [/banco do brasil|bco do brasil|\bbb\b/, 'Banco do Brasil'],
 ];
 
-export function parsePixReceipt(rows: Row[]): PixReceipt {
+/** frases que dizem o sentido; vale a que aparece primeiro (o título) */
+const SAYS_RECEIVED = /\b(pix recebido|transferencia recebida|voce recebeu|recebeu um pix|recebimento de pix|pix de entrada|entrada de pix|comprovante de recebimento|credito recebido|valor recebido|deposito recebido)\b/;
+const SAYS_SENT = /\b(pix enviado|transferencia enviada|voce enviou|enviou um pix|voce pagou|voce transferiu|pix realizado|pix efetuado|transferencia realizada|transferencia efetuada|pagamento realizado|pagamento efetuado|comprovante de pagamento)\b/;
+
+export function keywordDirection(all: string): PixDirection | null {
+  const r = all.search(SAYS_RECEIVED);
+  const s = all.search(SAYS_SENT);
+  if (r < 0 && s < 0) return null;
+  if (s < 0) return 'received';
+  if (r < 0) return 'sent';
+  return r < s ? 'received' : 'sent';
+}
+
+export function parsePixReceipt(rows: Row[], me: OwnIdentity = EMPTY_IDENTITY): PixReceipt {
   const all = norm(rows.map((r) => r.join(' ')).join('\n'));
   const looksLikePix = /\bpix\b/.test(all);
-  const direction: PixDirection = /pix recebido|voce recebeu|recebimento de pix|transferencia recebida/.test(all) ? 'received' : 'sent';
 
   // valor: linha com rótulo "valor" (não tarifa), ou a próxima; senão o primeiro R$ do comprovante
   let amountCents: number | null = null;
@@ -269,11 +294,26 @@ export function parsePixReceipt(rows: Row[]): PixReceipt {
     }
   }
 
-  // quem é a outra parte
-  const sectionLabels = direction === 'sent' ? DEST : ORIGIN;
-  const stopLabels = direction === 'sent' ? ORIGIN : DEST;
-  const idx = findRow(rows, sectionLabels);
-  const person = idx >= 0 ? sectionPerson(rows, idx, stopLabels) : { name: null, doc: null };
+  // os dois lados: quem recebeu (Para/Destino…) e quem pagou (De/Origem…)
+  const destIdx = findRow(rows, DEST);
+  const originIdx = findRow(rows, ORIGIN);
+  const payee: Party = destIdx >= 0 ? sectionPerson(rows, destIdx, ORIGIN) : { name: null, doc: null };
+  const payer: Party = originIdx >= 0 ? sectionPerson(rows, originIdx, DEST) : { name: null, doc: null };
+
+  // gasto ou receita: você em um dos lados > o que o comprovante diz > não sei (padrão "enviado")
+  const meP = isMe(me, payer);
+  const meR = isMe(me, payee);
+  const said = keywordDirection(all);
+  let direction: PixDirection = 'sent';
+  let directionSource: DirectionSource = 'default';
+  if (meP !== meR) {
+    direction = meP ? 'sent' : 'received';
+    directionSource = 'identity';
+  } else if (said) {
+    direction = said;
+    directionSource = 'keyword';
+  }
+  const person = direction === 'sent' ? payee : payer;
 
   // data e hora: linha com "data"/"quando", senão a primeira data do comprovante
   let date: DateISO | null = null;
@@ -301,9 +341,9 @@ export function parsePixReceipt(rows: Row[]): PixReceipt {
   }
 
   // o "eu" do comprovante: quem pagou (Pix enviado) ou quem recebeu (Pix recebido)
-  const selfIdx = findRow(rows, stopLabels);
-  const self = selfIdx >= 0 ? sectionPerson(rows, selfIdx, sectionLabels) : { name: null, doc: null };
-  const ownTransfer = !!person.doc && !!self.doc && person.doc === self.doc;
+  const selfIdx = direction === 'sent' ? originIdx : destIdx;
+  const sectionLabels = direction === 'sent' ? DEST : ORIGIN;
+  const ownTransfer = (!!payer.doc && payer.doc === payee.doc) || (meP && meR);
 
   // banco do app que gerou o comprovante: instituição do "eu"; senão o topo; senão o rodapé
   const findBank = (text: string) => BANKS.find(([re]) => re.test(text))?.[1] ?? null;
@@ -322,6 +362,9 @@ export function parsePixReceipt(rows: Row[]): PixReceipt {
     time,
     pixId,
     direction,
+    directionSource,
+    payer,
+    payee,
     bank,
     looksLikePix,
     ownTransfer,

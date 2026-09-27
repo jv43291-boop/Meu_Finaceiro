@@ -19,7 +19,7 @@ describe('comprovantes por banco', () => {
     expect(read('bb')).toEqual({
       amountCents: 18740, counterpartName: 'Carlos T Exemplo', counterpartDoc: '111222',
       date: '2026-08-05', time: '20:15', pixId: 'E00000001202608052315aB12cD34eF5',
-      direction: 'sent', bank: 'Banco do Brasil', looksLikePix: true, ownTransfer: true,
+      direction: 'sent', directionSource: 'keyword', payer: { name: 'Carlos T Exemplo', doc: '111222' }, payee: { name: 'Carlos T Exemplo', doc: '111222' }, bank: 'Banco do Brasil', looksLikePix: true, ownTransfer: true,
     });
   });
 
@@ -27,7 +27,7 @@ describe('comprovantes por banco', () => {
     expect(read('itau')).toEqual({
       amountCents: 25000, counterpartName: 'Maria Ficticia Souza', counterpartDoc: '333444',
       date: '2026-08-12', time: '14:05', pixId: 'E00000002202608121705XY12ZW34QRS',
-      direction: 'sent', bank: 'Itaú', looksLikePix: true, ownTransfer: false,
+      direction: 'sent', directionSource: 'default', payer: { name: 'Carlos Teste Exemplo', doc: '111222' }, payee: { name: 'Maria Ficticia Souza', doc: '333444' }, bank: 'Itaú', looksLikePix: true, ownTransfer: false,
     });
   });
 
@@ -35,7 +35,7 @@ describe('comprovantes por banco', () => {
     expect(read('picpay')).toEqual({
       amountCents: 9500, counterpartName: 'ANA PAULA FICTICIA DOS SANTOS', counterpartDoc: '555666',
       date: '2026-08-03', time: '10:15', pixId: 'E00000003202608031315aa11bb22cc3',
-      direction: 'sent', bank: 'PicPay', looksLikePix: true, ownTransfer: false,
+      direction: 'sent', directionSource: 'default', payer: { name: 'Carlos Teste Exemplo', doc: '111222' }, payee: { name: 'ANA PAULA FICTICIA DOS SANTOS', doc: '555666' }, bank: 'PicPay', looksLikePix: true, ownTransfer: false,
     });
   });
 
@@ -43,7 +43,7 @@ describe('comprovantes por banco', () => {
     expect(read('nubank')).toEqual({
       amountCents: 102075, counterpartName: 'Carlos Teste Exemplo', counterpartDoc: '111222',
       date: '2026-08-18', time: '11:22', pixId: 'E00000004202608181133z000a1b2c3d',
-      direction: 'sent', bank: 'Nubank', looksLikePix: true, ownTransfer: true,
+      direction: 'sent', directionSource: 'default', payer: { name: 'Carlos Teste Exemplo', doc: '111222' }, payee: { name: 'Carlos Teste Exemplo', doc: '111222' }, bank: 'Nubank', looksLikePix: true, ownTransfer: true,
     });
   });
 
