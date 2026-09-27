@@ -6,15 +6,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, View } from 'react-native';
 
 import { getMeta, setMeta } from '@/db/repo';
-import { formatDateBR, parseDateBR, todayISO, type DateISO } from '@/domain/dates';
+import { formatDateBR, monthOf, parseDateBR, todayISO, type DateISO } from '@/domain/dates';
 import { formatBRL, formatPlain, parseMoney } from '@/domain/money';
 import { findDuplicatePix, findPayeeRule, normalizeName, suggestFromHistory, upsertPayeeRule } from '@/domain/payeeRules';
 import { learnIdentity, parseIdentity } from '@/domain/pixIdentity';
 import type { PixReceipt } from '@/domain/pixReceipt';
+import { receiptWhen } from '@/domain/receiptMonth';
 import type { EntryType } from '@/domain/types';
 import { ctx, useFinance } from '@/state/finance';
 import { Button, Card, Chip, Empty, Field, Input, Pill, Screen, Segmented, SwitchRow, T, tapFeedback } from '@/ui/components';
-import { notify } from '@/ui/dialogs';
+import { confirmAsk, notify } from '@/ui/dialogs';
 import { pickFromFiles, pickFromGallery, readerAvailable, readReceipt, type ReadResult, type ReceiptFile } from '@/ui/receiptReader';
 import { space, useColors } from '@/ui/theme';
 
@@ -114,7 +115,8 @@ export default function ReceiptScreen() {
       setDescTouched(false);
       prefill(r.receipt, t, false);
       setAmount(r.receipt.amountCents ? formatPlain(r.receipt.amountCents) : '');
-      setDateText(formatDateBR(r.receipt.date ?? todayISO()));
+      // a data é a do Pix, nunca a de hoje: sem data legível, o campo fica vazio para a pessoa digitar
+      setDateText(r.receipt.date ? formatDateBR(r.receipt.date) : '');
       setShowText(false);
       setPhase('review');
       tapFeedback('success');
@@ -146,7 +148,11 @@ export default function ReceiptScreen() {
     const date: DateISO | null = parseDateBR(dateText, new Date().getFullYear());
     if (!type) return notify('Foi gasto ou receita?', 'Escolha “Paguei” ou “Recebi” antes de lançar.');
     if (!cents || cents <= 0) return notify('Confira o valor', 'Informe um valor maior que zero.');
-    if (!date) return notify('Confira a data', 'Use o formato dd/mm/aaaa.');
+    if (!date) return notify('Confira a data', dateText.trim() ? 'Use o formato dd/mm/aaaa.' : 'Não achei a data no comprovante. Digite o dia em que o Pix foi feito.');
+    if (receiptWhen(date, todayISO()).kind === 'future') {
+      const ok = await confirmAsk('Data no futuro?', `${formatDateBR(date)} ainda não chegou. Pode ter sido erro de leitura. Lançar assim mesmo?`, 'Lançar');
+      if (!ok) return;
+    }
     if (!description.trim()) return notify('Falta a descrição', 'Ex.: Compra de pão');
     setBusy(true);
     try {
@@ -173,6 +179,8 @@ export default function ReceiptScreen() {
       }
       tapFeedback('success');
       reset();
+      // abre a lista no mês do Pix (que pode não ser o mês atual)
+      f.setSelectedMonth(monthOf(date));
       router.replace('/lancamentos');
     } catch (e) {
       await notify('Não foi possível salvar', e instanceof Error ? e.message : String(e));
@@ -180,6 +188,14 @@ export default function ReceiptScreen() {
       setBusy(false);
     }
   }
+
+  const when = receiptWhen(parseDateBR(dateText, new Date().getFullYear()), todayISO());
+  const at = receipt?.time ? ` às ${receipt.time}` : '';
+  const dateHint =
+    when.kind === 'missing' ? (dateText.trim() ? 'Use o formato dd/mm/aaaa.' : 'Não achei a data no comprovante: digite o dia do Pix.')
+      : when.kind === 'future' ? `Data depois de hoje${at}: confira, pode ser erro de leitura.`
+        : when.kind === 'current' ? `Feito${at}. Entra em ${when.label}, o mês atual.`
+          : `Feito${at}. Entra em ${when.label}, não no mês atual${when.old ? ` (${when.monthsAgo} meses atrás: confira)` : ''}.`;
 
   const categories = f.categories.filter((cat) => cat.type === type && !cat.archived);
   const accounts = f.accounts.filter((a) => !a.archived);
@@ -296,7 +312,7 @@ export default function ReceiptScreen() {
             </Field>
           ) : null}
 
-          <Field label="Data" hint={receipt.time ? `Feito às ${receipt.time}` : undefined}>
+          <Field label="Data do Pix" hint={dateHint}>
             <Input value={dateText} onChangeText={setDateText} placeholder="dd/mm/aaaa" keyboardType="numbers-and-punctuation" />
           </Field>
 

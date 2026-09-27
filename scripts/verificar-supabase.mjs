@@ -34,6 +34,17 @@ const health = await get('/auth/v1/health');
 if (health.status === 200) ok('projeto responde (auth)');
 else bad(`projeto não respondeu (status ${health.status}) ${health.body.slice(0, 120)}`);
 
+// cadastro: a confirmação por e-mail está ligada? (o e-mail padrão do Supabase quase nunca chega)
+const settings = await get('/auth/v1/settings');
+try {
+  const st = JSON.parse(settings.body);
+  if (st.disable_signup) bad('criar conta está DESLIGADO no Supabase (Allow new users to sign up)');
+  else if (st.mailer_autoconfirm) ok('criar conta: entra direto, sem e-mail de confirmação');
+  else console.log('  info criar conta: pede confirmação por e-mail — só funciona com SMTP próprio e {{ .Token }} no modelo "Confirm signup"');
+} catch {
+  console.log(`  info não consegui ler as configurações de cadastro (status ${settings.status})`);
+}
+
 const CHECKS = {
   accounts: 'id,server_updated_at',
   categories: 'id,budget_cents,server_updated_at',

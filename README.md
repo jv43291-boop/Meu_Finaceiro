@@ -74,6 +74,7 @@ Aplicativo de finanças pessoais em Expo, React Native e TypeScript, sucessor do
   - **gasto ou receita**: o app só escolhe sozinho quando o comprovante mostra o sentido — o seu nome/CPF em um dos lados (aprendido dos comprovantes que você confirmou, guardado só no aparelho e apagado ao sair da conta) ou frases como "Pix enviado"/"Você recebeu". Sem isso, a tela pede "Paguei" ou "Recebi" e não lança nada até você escolher; você dos dois lados vira aviso de transferência entre suas contas;
   - **regras por recebedor** (ex.: "José Ribeiro" vira "Compra de pão"), com sugestão pelo histórico quando não há regra;
   - aviso de comprovante repetido;
+  - **mês certo:** entra na data do Pix escrita no comprovante, não no dia em que foi lido (Pix de agosto lido em setembro vai para agosto). Sem data legível, o campo fica vazio para digitar; data no futuro pede confirmação;
   - funciona só no APK, porque usa o módulo nativo.
 - Lembretes de vencimento: notificações locais que agrupam o mesmo dia, com opção de esconder o valor na tela bloqueada.
 - Bloqueio com digital ou rosto, com a senha do celular como alternativa.
