@@ -87,6 +87,9 @@ Aplicativo de finanças pessoais em Expo, React Native e TypeScript, sucessor do
 - Importar o backup do Meu Financeiro 1.0.
 - Personalizar: tema claro/escuro, cor de destaque, foto de fundo e "esconder valores".
 - **Modo gamer** (Aparência): tema escuro neon, títulos em fonte pixelada, orçamento como barra de vida (HP, esvazia com o gasto), metas como barra de experiência (XP) e saldo como "ouro". Valores continuam na fonte normal. Liga/desliga a qualquer hora e volta ao padrão ao sair da conta.
+  - **XP e níveis** calculados dos seus dados (sincroniza sozinho, não dá para "farmar"): +10 por dia registrado em dia, bônus de sequência de 7/30 dias, +50 por orçamento fechado no limite, +100 com todos no limite, +50 no mês sem conta atrasada, marcos de metas (25/50/75/100%) e +100 por missão. **Gastar nunca dá XP**; lançamentos importados do extrato não contam como registro;
+  - "Hoje não gastei" mantém a sequência (fica guardado no aparelho);
+  - 3 missões por mês (registrar em 20 dias, fechar abaixo de 80% a categoria que mais pesou, 20% menos compras pequenas de até R$ 30 — ou pagar tudo em dia) e 10 conquistas, em Mais → Conquistas.
 - Diagnóstico (Mais → Avançado):
   - SQLite, registros por tabela, conta, Supabase, estado da sincronização e relógio;
   - "Revalidar integridade", que só aponta problemas, sem corrigir;
@@ -145,6 +148,7 @@ TESTES (vitest)
 ├── Cartões ........ fatura, parcelas, pagamento
 ├── Planejamento ... orçamentos, metas, projeção, análise do mês
 ├── Pix/recibo ..... parser por banco, gasto × receita, casos ambíguos, regras, histórico
+├── Modo gamer ..... XP, sequência, níveis, missões, conquistas
 ├── Extrato ........ três formatos de extrato, sinal × palavras, saldos, repetidos
 ├── Integridade .... checagens e diagnóstico sem dados sensíveis
 └── Sync/offline ... motor, relógio, fila/quarentena, isolamento A↔B

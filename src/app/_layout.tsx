@@ -81,6 +81,7 @@ function ThemedApp() {
             <Stack.Screen name="seguranca" options={{ title: 'Bloqueio do app' }} />
             <Stack.Screen name="comprovante" options={{ title: 'Comprovante de Pix' }} />
             <Stack.Screen name="extrato" options={{ title: 'Importar extrato' }} />
+            <Stack.Screen name="conquistas" options={{ title: 'Conquistas' }} />
             <Stack.Screen name="recebedores" options={{ title: 'Regras de recebedores' }} />
             <Stack.Screen name="diagnostico" options={{ title: 'Diagnóstico' }} />
             <Stack.Screen name="cartao/[id]" options={{ title: 'Cartão' }} />

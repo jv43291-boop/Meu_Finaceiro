@@ -10,6 +10,7 @@ import { useFinance } from '@/state/finance';
 import { Amount, Card, Empty, Icon, IconButton, ListRow, Pill, Screen, T } from '@/ui/components';
 import { BudgetBar } from '@/ui/Charts';
 import { ItemRow } from '@/ui/ItemRow';
+import { GamerProfile } from '@/ui/GamerProfile';
 import { ProjectionCard } from '@/ui/ProjectionCard';
 import { MonthChanges } from '@/ui/Analysis';
 import { openItem } from '@/ui/nav';
@@ -79,6 +80,8 @@ export default function HomeScreen() {
           <Pill tone="hero" label={daysLeft === 0 ? 'último dia' : daysLeft === 1 ? '1 dia' : `${daysLeft} dias`} />
         </View>
       </View>
+
+      {c.gamer ? <GamerProfile /> : null}
 
       <View style={{ flexDirection: 'row', gap: space.md }}>
         <Card style={{ flex: 1, gap: 6 }}>
