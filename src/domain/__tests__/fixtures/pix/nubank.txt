@@ -1,0 +1,22 @@
+Comprovante de transferência
+18 AGO 2026 - 11:22:33
+Valor   R$ 1.020,75
+Tipo de transferência   Pix
+Destino
+Nome   Carlos Teste Exemplo
+CPF   •••.111.222-••
+Instituição   PICPAY
+Agência   0001
+Conta   00000000-0
+Tipo de conta   Conta de pagamentos
+Origem
+Nome   Carlos Teste Exemplo
+Instituição   NU PAGAMENTOS - IP
+Agência   0001
+Conta   000000000-0
+CPF   •••.111.222-••
+Nu Pagamentos S.A. - Instituição de Pagamento
+CNPJ 00.000.000/0001-00
+ID da transação:
+E00000004202608181133z000a1b2c3d
+Estamos aqui para ajudar se você tiver alguma dúvida.

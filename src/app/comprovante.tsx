@@ -79,7 +79,8 @@ export default function ReceiptScreen() {
       setCategoryId(found?.categoryId ?? hist?.categoryId ?? null);
       setAccountId(found?.accountId ?? f.defaultAccountId);
       setDateText(formatDateBR(r.receipt.date ?? todayISO()));
-      setRemember(!found);
+      // transferência para você mesmo: não vale criar regra "seu nome = descrição"
+      setRemember(!found && !r.receipt.ownTransfer);
       setShowText(false);
       setPhase('review');
       tapFeedback('success');
@@ -175,6 +176,15 @@ export default function ReceiptScreen() {
 
       {phase === 'review' && result && receipt ? (
         <>
+          {receipt.ownTransfer ? (
+            <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>
+              <T variant="bodyStrong" color={c.warning}>Parece transferência entre suas contas</T>
+              <T variant="caption">
+                O mesmo CPF aparece como quem pagou e quem recebeu. Se lançar como {type === 'income' ? 'receita' : 'gasto'}, o saldo total muda sem você ter {type === 'income' ? 'recebido' : 'gastado'} nada. Normalmente não é para lançar.
+              </T>
+            </Card>
+          ) : null}
+
           {duplicate ? (
             <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>
               <T variant="bodyStrong" color={c.warning}>Este comprovante já foi lançado</T>
@@ -243,7 +253,7 @@ export default function ReceiptScreen() {
             />
           ) : null}
 
-          <Button title={duplicate ? 'Lançar mesmo assim' : type === 'income' ? 'Lançar como recebido' : 'Lançar como pago'} icon="check" onPress={save} disabled={busy} />
+          <Button title={duplicate || receipt.ownTransfer ? 'Lançar mesmo assim' : type === 'income' ? 'Lançar como recebido' : 'Lançar como pago'} icon="check" onPress={save} disabled={busy} />
           <Button title="Ler outro comprovante" icon="refresh" variant="secondary" onPress={reset} disabled={busy} />
 
           <Button title={showText ? 'Esconder texto lido' : 'Ver texto lido'} icon="text-recognition" variant="ghost" onPress={() => setShowText((v) => !v)} />

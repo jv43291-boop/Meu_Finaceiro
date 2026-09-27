@@ -39,6 +39,8 @@ export interface PixReceipt {
   bank: string | null;
   /** o texto parece mesmo um comprovante de Pix */
   looksLikePix: boolean;
+  /** mesma pessoa dos dois lados (mesmo CPF/CNPJ visível): transferência entre contas próprias */
+  ownTransfer: boolean;
 }
 
 /** minúsculo, sem acento, espaços simples */
@@ -109,6 +111,9 @@ export function parseDateBR(s: string): DateISO | null {
   const n = norm(s);
   let m = n.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
   if (m) return iso(+m[3], +m[2], +m[1]);
+  // "03/ago/2026" (PicPay)
+  m = n.match(/\b(\d{1,2})\/(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*\/(\d{4})\b/);
+  if (m) return iso(+m[3], MONTHS[m[2]], +m[1]);
   m = n.match(/\b(\d{1,2})(?:\s+de)?\s+(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-z]*\.?(?:\s+de)?\s+(\d{4})\b/);
   if (m) return iso(+m[3], MONTHS[m[2]], +m[1]);
   m = n.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
@@ -118,7 +123,11 @@ export function parseDateBR(s: string): DateISO | null {
 
 function parseTime(s: string): string | null {
   const m = s.match(/\b([01]?\d|2[0-3])[:h]([0-5]\d)(?::[0-5]\d)?\b/);
-  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : null;
+  if (m) return `${m[1].padStart(2, '0')}:${m[2]}`;
+  // logo depois da data: "03/ago/2026 - 101530" (sem separador) ou com um caractere
+  // estranho no lugar do ":" (a fonte do PDF do PicPay usa um símbolo próprio)
+  const c = s.match(/\d{4}\s*[-–]\s*([01]\d|2[0-3])[^\d\s]?([0-5]\d)(?:[^\d\s]?[0-5]\d)?\b/);
+  return c ? `${c[1]}:${c[2]}` : null;
 }
 
 // ---------- rótulos ----------
@@ -168,6 +177,21 @@ function docDigits(s: string): string | null {
 }
 
 /** Procura o nome e o documento de uma seção (a partir da linha do cabeçalho). */
+/** linha que é nome de banco/instituição, não de pessoa */
+const INSTITUTION = /\b(banco|bco|s\.?\s?a\.?|s\/a|instituicao|pagamentos?|unibanco|picpay|nubank|nu pagamentos|caixa|bradesco|itau|santander|cooperativa|ip)\b/;
+
+/**
+ * O nome às vezes quebra em duas linhas (PicPay: "ANA PAULA FICTICIA" / "DOS SANTOS").
+ * Junta a linha seguinte quando ela parece continuação do nome e vem logo antes do documento.
+ */
+function withContinuation(rows: Row[], i: number, name: string): string {
+  const next = rows[i + 1];
+  const after = rows[i + 2];
+  if (!next || next.length !== 1 || !isNameLike(next[0]) || INSTITUTION.test(norm(next[0]))) return name;
+  const afterIsDoc = !!after && (docDigits(after.join(' ')) !== null || /^(cpf|cnpj|documento)\b/.test(norm(after[0])));
+  return afterIsDoc ? cleanName(`${name} ${next[0]}`) : name;
+}
+
 function sectionPerson(rows: Row[], start: number, stopLabels: string[]): { name: string | null; doc: string | null } {
   let name: string | null = null;
   let doc: string | null = null;
@@ -190,7 +214,8 @@ function sectionPerson(rows: Row[], start: number, stopLabels: string[]): { name
       doc = docDigits(joined) ?? (rows[i + 1] ? docDigits(rows[i + 1].join(' ')) : null);
       continue;
     }
-    if (!doc) doc = docDigits(joined);
+    // documento sem rótulo (PicPay: "***.555.666**"); nunca de linha de conta/agência/chave
+    if (!doc && !FIELD.test(first)) doc = docDigits(joined);
 
     if (!name && /^nome\b/.test(first)) {
       const rest = [row[0].replace(/^\s*nome\s*:?\s*/i, ''), ...row.slice(1)].filter((x) => x.trim());
@@ -200,7 +225,7 @@ function sectionPerson(rows: Row[], start: number, stopLabels: string[]): { name
     }
     if (!name) {
       const cand = row.find(isNameLike);
-      if (cand && !FIELD.test(first)) name = cleanName(cand);
+      if (cand && !FIELD.test(first)) name = row.length === 1 ? withContinuation(rows, i, cleanName(cand)) : cleanName(cand);
     }
     if (name && doc) break;
   }
@@ -219,7 +244,7 @@ const BANKS: [RegExp, string][] = [
   [/santander/, 'Santander'],
   [/caixa tem/, 'Caixa Tem'],
   [/caixa/, 'Caixa'],
-  [/banco do brasil|\bbb\b/, 'Banco do Brasil'],
+  [/banco do brasil|bco do brasil|\bbb\b/, 'Banco do Brasil'],
 ];
 
 export function parsePixReceipt(rows: Row[]): PixReceipt {
@@ -275,8 +300,19 @@ export function parsePixReceipt(rows: Row[]): PixReceipt {
     }
   }
 
+  // o "eu" do comprovante: quem pagou (Pix enviado) ou quem recebeu (Pix recebido)
+  const selfIdx = findRow(rows, stopLabels);
+  const self = selfIdx >= 0 ? sectionPerson(rows, selfIdx, sectionLabels) : { name: null, doc: null };
+  const ownTransfer = !!person.doc && !!self.doc && person.doc === self.doc;
+
+  // banco do app que gerou o comprovante: instituição do "eu"; senão o topo; senão o rodapé
+  const findBank = (text: string) => BANKS.find(([re]) => re.test(text))?.[1] ?? null;
+  let selfEnd = Math.min(rows.length, selfIdx + 9);
+  for (let i = selfIdx + 1; selfIdx >= 0 && i < selfEnd; i++) if (startsWithLabel(rows[i][0], sectionLabels) !== null) selfEnd = i;
+  const selfBlock = selfIdx >= 0 ? norm(rows.slice(selfIdx, selfEnd).map((r) => r.join(' ')).join(' ')) : '';
   const top = norm(rows.slice(0, 4).map((r) => r.join(' ')).join(' '));
-  const bank = BANKS.find(([re]) => re.test(top))?.[1] ?? null;
+  const footer = norm(rows.slice(-8).map((r) => r.join(' ')).join(' '));
+  const bank = findBank(selfBlock) ?? findBank(top) ?? findBank(footer);
 
   return {
     amountCents,
@@ -288,5 +324,6 @@ export function parsePixReceipt(rows: Row[]): PixReceipt {
     direction,
     bank,
     looksLikePix,
+    ownTransfer,
   };
 }
