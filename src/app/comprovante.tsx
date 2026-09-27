@@ -231,7 +231,25 @@ export default function ReceiptScreen() {
         </Card>
       ) : null}
 
-      {phase === 'review' && result && receipt ? (
+      {phase === 'review' && result && receipt?.looksLikeStatement ? (
+        <>
+          <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>
+            <T variant="bodyStrong" color={c.warning}>Isso parece um extrato, não um comprovante</T>
+            <T variant="caption">
+              O arquivo tem vários lançamentos com data e valor. Esta tela lança um Pix por vez, então não vou transformar o extrato inteiro em um lançamento só. A importação de extrato (cada linha vira um lançamento, separando gastos e entradas) ainda está sendo feita.
+            </T>
+          </Card>
+          <Button title="Ler um comprovante" icon="refresh" onPress={reset} />
+          <Button title={showText ? 'Esconder texto lido' : 'Ver texto lido'} icon="text-recognition" variant="ghost" onPress={() => setShowText((v) => !v)} />
+          {showText ? (
+            <Card>
+              <T variant="caption" selectable style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>{result.text}</T>
+            </Card>
+          ) : null}
+        </>
+      ) : null}
+
+      {phase === 'review' && result && receipt && !receipt.looksLikeStatement ? (
         <>
           {receipt.ownTransfer ? (
             <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>

@@ -52,6 +52,8 @@ export interface PixReceipt {
   bank: string | null;
   /** o texto parece mesmo um comprovante de Pix */
   looksLikePix: boolean;
+  /** o arquivo parece um EXTRATO (vários lançamentos), não um comprovante de um Pix só */
+  looksLikeStatement: boolean;
   /** mesma pessoa dos dois lados (mesmo CPF/CNPJ visível, ou você nos dois): transferência entre contas próprias */
   ownTransfer: boolean;
 }
@@ -273,6 +275,21 @@ export function keywordDirection(all: string): PixDirection | null {
   return r < s ? 'received' : 'sent';
 }
 
+/**
+ * Extrato: título de extrato/saldo e várias linhas com data e valor.
+ * Um comprovante tem 1 ou 2 datas (feito em / emitido em); um extrato tem dezenas.
+ */
+export function looksLikeStatement(rows: Row[]): boolean {
+  const all = norm(rows.map((r) => r.join(' ')).join('\n'));
+  const title = /\b(extrato|saldo anterior|saldo do dia|saldo final|saldo inicial|movimentacoes|lancamentos do periodo|periodo de)\b/.test(all);
+  let dated = 0;
+  for (const r of rows) {
+    const t = r.join(' ');
+    if (parseDateBR(t) && /\d,\d{2}\b/.test(t)) dated++;
+  }
+  return dated >= 5 || (title && dated >= 3);
+}
+
 export function parsePixReceipt(rows: Row[], me: OwnIdentity = EMPTY_IDENTITY): PixReceipt {
   const all = norm(rows.map((r) => r.join(' ')).join('\n'));
   const looksLikePix = /\bpix\b/.test(all);
@@ -367,6 +384,7 @@ export function parsePixReceipt(rows: Row[], me: OwnIdentity = EMPTY_IDENTITY): 
     payee,
     bank,
     looksLikePix,
+    looksLikeStatement: looksLikeStatement(rows),
     ownTransfer,
   };
 }
