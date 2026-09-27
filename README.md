@@ -121,7 +121,12 @@ Pessoa ─► SQLite no celular ─► app funciona sem internet
 
    Nenhum deles mexe na tabela antiga `finance_backups`.
 2. Copie `.env.example` para `.env` e preencha `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` com a chave **publishable**. Nunca use a chave secret/service_role no app.
-3. `node scripts/verificar-supabase.mjs` confere se o projeto responde e se as tabelas existem. O script nunca mostra a chave.
+3. **E-mail de confirmação** (Authentication no painel do Supabase). O envio de e-mail que vem de fábrica só entrega para os e-mails da equipe do projeto e manda poucos por hora. Escolha um:
+   - **app pessoal:** em *Sign In / Providers → Email*, desligue **Confirm email**. A conta já entra sincronizando assim que é criada;
+   - **manter a confirmação:** configure um SMTP próprio em *Emails → SMTP Settings* (ex.: Resend ou Brevo) e, em *Emails → Templates → Confirm signup*, inclua `{{ .Token }}` para o app aceitar o código. O link sozinho não serve no celular, porque aponta para o *Site URL*.
+
+   No app, depois de criar a conta, aparece a confirmação por código, com "Reenviar e-mail".
+4. `node scripts/verificar-supabase.mjs` confere se o projeto responde e se as tabelas existem. O script nunca mostra a chave.
 
 Ao entrar com a conta do app antigo, o Live encontra o backup em `finance_backups` e oferece a importação.
 

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
-import { useCloud } from '@/state/cloud';
+import { EmailNotConfirmedError, useCloud } from '@/state/cloud';
 import { OFFSET_WARN_MS } from '@/sync/clock';
 import { useFinance } from '@/state/finance';
 import { Button, Card, Field, Icon, Input, Pill, Screen, Segmented, T } from '@/ui/components';
@@ -119,6 +119,16 @@ export default function CloudScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  // conta criada, esperando confirmar o e-mail
+  const [pending, setPending] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   if (!cloud.configured) {
     return (
@@ -143,11 +153,46 @@ export default function CloudScreen() {
       if (mode === 'in') await cloud.signIn(email, password);
       else {
         const r = await cloud.signUp(email, password);
-        if (r.needsConfirmation) await notify('Conta criada', 'Abra o link de confirmação enviado para o seu e-mail e depois toque em Entrar.');
+        if (r.needsConfirmation) {
+          setPending(email.trim());
+          setCooldown(60);
+        }
       }
       setPassword('');
     } catch (e) {
+      if (e instanceof EmailNotConfirmedError) {
+        setPending(email.trim());
+        return;
+      }
       await notify('Não foi possível continuar', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmCode() {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      await cloud.confirmWithCode(pending, code);
+      setPending(null);
+      setCode('');
+    } catch (e) {
+      await notify('Não foi possível confirmar', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resend() {
+    if (!pending) return;
+    setBusy(true);
+    try {
+      await cloud.resendConfirmation(pending);
+      setCooldown(60);
+      await notify('E-mail reenviado', `Confira a caixa de entrada e o spam de ${pending}.`);
+    } catch (e) {
+      await notify('Não foi possível reenviar', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -177,6 +222,20 @@ export default function CloudScreen() {
             O app continua funcionando sem internet. Com a conta, tudo sincroniza sozinho e você pode usar em outro celular.
           </T>
         </View>
+        {pending ? (
+          <Card style={{ borderWidth: 1.5, borderColor: c.warning }}>
+            <T variant="bodyStrong">Confirme o seu e-mail</T>
+            <T variant="caption">
+              Enviamos um e-mail para {pending}. Digite o código que veio nele (ou abra o link). Se não chegar em alguns minutos, olhe o spam ou peça de novo. Enquanto isso, tudo continua salvo neste celular e sobe para a conta assim que ela for confirmada.
+            </T>
+            <Field label="Código do e-mail">
+              <Input value={code} onChangeText={setCode} placeholder="123456" keyboardType="number-pad" autoComplete="one-time-code" textContentType="oneTimeCode" maxLength={10} />
+            </Field>
+            <Button title="Confirmar código" icon="check" onPress={confirmCode} disabled={busy || code.replace(/\D/g, '').length < 6} />
+            <Button title={cooldown > 0 ? `Reenviar e-mail (${cooldown} s)` : 'Reenviar e-mail'} icon="email-sync-outline" variant="secondary" onPress={resend} disabled={busy || cooldown > 0} />
+            <Button title="Usar outro e-mail" variant="ghost" onPress={() => { setPending(null); setCode(''); }} disabled={busy} />
+          </Card>
+        ) : null}
         <Segmented value={mode} onChange={setMode} options={[{ value: 'in', label: 'Entrar' }, { value: 'up', label: 'Criar conta' }]} />
         <Field label="E-mail">
           <Input value={email} onChangeText={setEmail} autoCapitalize="none" autoComplete="email" keyboardType="email-address" textContentType="emailAddress" />

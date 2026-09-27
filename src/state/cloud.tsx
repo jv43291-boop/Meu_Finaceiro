@@ -37,6 +37,10 @@ interface CloudValue {
   discardRejected: (item: RejectedItem) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ needsConfirmation: boolean }>;
+  /** reenvia o e-mail de confirmação da conta */
+  resendConfirmation: (email: string) => Promise<void>;
+  /** confirma a conta com o código do e-mail (sem depender do link) */
+  confirmWithCode: (email: string, code: string) => Promise<void>;
   /**
    * Envia o pendente e sai, apagando os dados deste celular.
    * Se sobrar algo sem enviar (sem internet), não sai e devolve quantos são;
@@ -56,8 +60,19 @@ const legacyKey = (uid: string) => `legacy_checked:${uid}`;
 const RETRY_DELAYS_MS = [30_000, 60_000, 120_000, 300_000, 600_000, 1_200_000, 1_800_000];
 const CLOCK_KEY = 'clock_offset_ms';
 
+/** a conta existe mas o e-mail ainda não foi confirmado (a tela mostra como confirmar) */
+export class EmailNotConfirmedError extends Error {
+  constructor() {
+    super('Sua conta ainda não foi confirmada. Digite o código do e-mail ou peça um novo.');
+    this.name = 'EmailNotConfirmedError';
+  }
+}
+
 function friendly(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
+  if (/rate limit|only request this after|too many/i.test(msg)) return 'O Supabase limitou o envio de e-mails. Espere alguns minutos e tente de novo.';
+  if (/token has expired|invalid.*(token|otp)|otp.*(expired|invalid)/i.test(msg)) return 'Código inválido ou vencido. Peça um novo e-mail.';
+  if (/error sending (confirmation|magic link|recovery)|smtp/i.test(msg)) return 'O Supabase não conseguiu enviar o e-mail. Veja em Conta e sincronização como resolver.';
   if (/Invalid login credentials/i.test(msg)) return 'E-mail ou senha incorretos.';
   if (/Email not confirmed/i.test(msg)) return 'Confirme o e-mail pelo link que o Supabase enviou e tente de novo.';
   if (/User already registered/i.test(msg)) return 'Já existe uma conta com esse e-mail. Use “Entrar”.';
@@ -268,6 +283,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
       async signIn(email, password) {
         if (!supabase) throw new Error('Nuvem não configurada.');
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error && /Email not confirmed/i.test(error.message)) throw new EmailNotConfirmedError();
         if (error) throw new Error(friendly(error));
       },
       async signUp(email, password) {
@@ -275,6 +291,19 @@ export function CloudProvider({ children }: { children: ReactNode }) {
         const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
         if (error) throw new Error(friendly(error));
         return { needsConfirmation: !data.session };
+      },
+      async resendConfirmation(email) {
+        if (!supabase) throw new Error('Nuvem não configurada.');
+        const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+        if (error) throw new Error(friendly(error));
+      },
+      async confirmWithCode(email, code) {
+        if (!supabase) throw new Error('Nuvem não configurada.');
+        const token = code.replace(/\D/g, '');
+        if (token.length < 6) throw new Error('Digite o código de 6 números do e-mail.');
+        // deu certo: a sessão chega pelo onAuthStateChange e a sincronização começa sozinha
+        const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token, type: 'signup' });
+        if (error) throw new Error(friendly(error));
       },
       async signOut(opts) {
         if (!supabase) return { done: true };
