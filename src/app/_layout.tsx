@@ -76,6 +76,7 @@ function ThemedApp() {
             <Stack.Screen name="metas" options={{ title: 'Metas' }} />
             <Stack.Screen name="meta/[id]" options={{ title: 'Meta' }} />
             <Stack.Screen name="relatorios" options={{ title: 'Relatórios' }} />
+            <Stack.Screen name="analiticos" options={{ title: 'Analíticos' }} />
             <Stack.Screen name="lembretes" options={{ title: 'Lembretes' }} />
             <Stack.Screen name="exportar" options={{ title: 'Exportar para planilha' }} />
             <Stack.Screen name="seguranca" options={{ title: 'Bloqueio do app' }} />

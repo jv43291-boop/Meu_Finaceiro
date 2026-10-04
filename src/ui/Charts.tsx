@@ -169,3 +169,100 @@ function Legend({ color, label }: { color: string; label: string }) {
     </View>
   );
 }
+
+/**
+ * Gasto ao longo do tempo (por dia, mês ou ano): barras de uma série só, eixo a partir do zero,
+ * linha tracejada da média. A maior barra fica no tom mais forte. Toque numa barra para ver o valor.
+ */
+export function ValueBars({
+  points,
+  selected,
+  onSelect,
+  detailLabel,
+  showTick = () => true,
+  averageOver,
+  height = 150,
+}: {
+  points: { key: string; label: string; cents: number }[];
+  selected: string | null;
+  onSelect: (key: string) => void;
+  /** texto do item selecionado ("04/09", "setembro de 2026", "2026") */
+  detailLabel: (key: string) => string;
+  /** quais rótulos do eixo mostrar (no gráfico por dia, só alguns) */
+  showTick?: (index: number) => boolean;
+  /** média calculada sobre: 'all' (todos os pontos) ou 'nonzero' (só os com gasto) */
+  averageOver: 'all' | 'nonzero';
+  height?: number;
+}) {
+  const c = useColors();
+  const hidden = useHideValues();
+  const money = (cents: number) => (hidden ? 'R$ •••' : formatBRL(cents));
+  const max = Math.max(1, ...points.map((p) => p.cents));
+  const base = averageOver === 'all' ? points : points.filter((p) => p.cents > 0);
+  const avg = base.length ? base.reduce((t, p) => t + p.cents, 0) / base.length : 0;
+  const sel = points.find((p) => p.key === selected) ?? null;
+  const dense = points.length > 16;
+  const barW = dense ? 6 : points.length > 8 ? 14 : 28;
+  const strong = c.primaryText;
+  return (
+    <View style={{ gap: space.md }}>
+      <View style={{ height, borderBottomWidth: 1, borderBottomColor: c.border }}>
+        {avg > 0 ? (
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: (avg / max) * height, flexDirection: 'row', gap: 4, overflow: 'hidden' }}>
+            {Array.from({ length: 60 }, (_, i) => (
+              <View key={i} style={{ width: 5, height: 1.5, backgroundColor: c.muted }} />
+            ))}
+          </View>
+        ) : null}
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end' }}>
+          {points.map((p) => {
+            const active = p.key === sel?.key;
+            const top = p.cents === max && p.cents > 0;
+            return (
+              <Pressable
+                key={p.key}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`${detailLabel(p.key)}: ${p.cents ? formatBRL(p.cents) : 'sem gastos'}`}
+                onPress={() => onSelect(p.key)}
+                hitSlop={{ top: 8, bottom: 8 }}
+                style={{ flex: 1, height, alignItems: 'center', justifyContent: 'flex-end', backgroundColor: active ? c.primarySoft : 'transparent', borderTopLeftRadius: 6, borderTopRightRadius: 6 }}>
+                <View
+                  style={{
+                    width: barW,
+                    height: p.cents > 0 ? Math.max(3, (p.cents / max) * height) : 0,
+                    backgroundColor: top || active ? strong : c.primary,
+                    borderTopLeftRadius: c.gamer ? 1 : 4,
+                    borderTopRightRadius: c.gamer ? 1 : 4,
+                  }}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row' }}>
+        {points.map((p, i) => (
+          <T key={p.key} variant="caption" numberOfLines={1} weight={p.key === sel?.key ? 'bold' : 'medium'} color={p.key === sel?.key ? c.text : undefined} style={{ flex: 1, textAlign: 'center', fontSize: dense ? 10 : 12 }}>
+            {showTick(i) ? p.label : ''}
+          </T>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', backgroundColor: c.surfaceAlt, borderRadius: 12, padding: space.md }}>
+        <View style={{ gap: 2 }}>
+          <T variant="caption">{sel ? detailLabel(sel.key) : 'Toque numa barra'}</T>
+          <T variant="bodyStrong">{sel ? (sel.cents ? money(sel.cents) : 'Sem gastos') : '—'}</T>
+        </View>
+        <View style={{ gap: 2, alignItems: 'flex-end' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', gap: 2 }}>
+              {[0, 1, 2].map((i) => <View key={i} style={{ width: 4, height: 1.5, backgroundColor: c.muted }} />)}
+            </View>
+            <T variant="caption">média</T>
+          </View>
+          <T variant="bodyStrong">{money(Math.round(avg))}</T>
+        </View>
+      </View>
+    </View>
+  );
+}

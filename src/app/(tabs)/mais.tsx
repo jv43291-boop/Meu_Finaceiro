@@ -40,6 +40,7 @@ export default function MoreScreen() {
         <ListRow icon="account-switch-outline" title="Regras de recebedores" subtitle={payeeRules.length ? `${payeeRules.length} regra(s) · ex.: José Ribeiro = Compra de pão` : 'Troque o nome da pessoa pelo que foi o gasto'} onPress={() => router.push('/recebedores')} />
       </Card>
       <Card>
+        <ListRow icon="chart-bar-stacked" title="Analíticos" subtitle="Gráficos de gasto por dia, mês e ano e pontos de atenção" onPress={() => router.push('/analiticos')} />
         <ListRow icon="chart-box-outline" title="Relatórios" subtitle="Gastos por categoria e evolução mensal" onPress={() => router.push('/relatorios')} />
         <ListRow icon="gauge" title="Orçamentos" subtitle="Limite por categoria, com aviso" onPress={() => router.push('/orcamentos')} />
         <ListRow icon="piggy-bank-outline" title="Metas" subtitle={goals.length ? `${goals.filter((g) => !g.archived).length} meta(s)` : 'Junte dinheiro para um objetivo'} onPress={() => router.push('/metas')} />
